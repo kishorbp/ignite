@@ -86,7 +86,7 @@ public interface GridComponent {
      *
      * @throws IgniteCheckedException Thrown in case of any errors.
      */
-    public void onKernalStart() throws IgniteCheckedException;
+    public void onKernalStart(boolean active) throws IgniteCheckedException;
 
     /**
      * Callback to notify that kernal is about to stop.

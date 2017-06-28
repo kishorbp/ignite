@@ -43,7 +43,7 @@ public interface GridCacheSharedManager<K, V> {
      * @param reconnect {@code True} if manager restarted after client reconnect.
      * @throws IgniteCheckedException If failed.
      */
-    public void onKernalStart(boolean reconnect) throws IgniteCheckedException;
+    public void onKernalStart(boolean active, boolean reconnect) throws IgniteCheckedException;
 
     /**
      * @param cancel Cancel flag.

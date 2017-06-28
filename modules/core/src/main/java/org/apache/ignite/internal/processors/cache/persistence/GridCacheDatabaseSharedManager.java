@@ -354,8 +354,6 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
     @Override protected void start0() throws IgniteCheckedException {
         snapshotMgr = cctx.snapshot();
 
-        assert !cctx.kernalContext().state().active() : "Cluster with persistent must starting as inactive.";
-
         if (!cctx.kernalContext().clientNode()) {
             IgnitePageStoreManager store = cctx.pageStore();
 
@@ -442,8 +440,8 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
     }
 
     /** {@inheritDoc} */
-    @Override protected void onKernalStart0(boolean reconnect) throws IgniteCheckedException {
-        if (reconnect || cctx.kernalContext().clientNode() || !cctx.kernalContext().state().active())
+    @Override protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
+        if (reconnect || cctx.kernalContext().clientNode() || !active)
             return;
 
         initDataBase();
@@ -774,13 +772,10 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
 
         boolean isSrvNode = !cctx.kernalContext().clientNode();
 
-        boolean clusterStatusActive = cctx.kernalContext().state().active();
-
-        boolean clusterInTransitionStateToActive = fut.newClusterState() == ClusterState.ACTIVE;
+        boolean clusterInTransitionStateToActive = fut.activateCluster();
 
         // Before local node join event.
-        if (clusterInTransitionStateToActive ||
-            (joinEvt && locNode && isSrvNode && clusterStatusActive))
+        if (clusterInTransitionStateToActive || (joinEvt && locNode && isSrvNode))
             restoreState();
 
         if (cctx.kernalContext().query().moduleEnabled()) {

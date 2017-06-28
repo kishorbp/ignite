@@ -423,11 +423,8 @@ public class GridDhtPartitionTopologyImpl implements GridDhtPartitionTopology {
         throws IgniteCheckedException {
         DiscoveryEvent discoEvt = exchFut.discoveryEvent();
 
-        ClusterState newState = exchFut.newClusterState();
-
-        treatAllPartAsLoc = (newState != null && newState == ClusterState.ACTIVE)
-            || (ctx.kernalContext().state().active()
-            && discoEvt.type() == EventType.EVT_NODE_JOINED
+        treatAllPartAsLoc = exchFut.activateCluster()
+            || (discoEvt.type() == EventType.EVT_NODE_JOINED
             && discoEvt.eventNode().isLocal()
             && !ctx.kernalContext().clientNode()
         );
@@ -610,7 +607,7 @@ public class GridDhtPartitionTopologyImpl implements GridDhtPartitionTopology {
                     if (locPart != null) {
                         GridDhtPartitionState state = locPart.state();
 
-                        if (state == MOVING && ctx.kernalContext().state().active()) {
+                        if (state == MOVING) {
                             locPart.rent(false);
 
                             updateSeq = updateLocal(p, locPart.state(), updateSeq);
@@ -1768,9 +1765,6 @@ public class GridDhtPartitionTopologyImpl implements GridDhtPartitionTopology {
      * @return Checks if any of the local partitions need to be evicted.
      */
     private boolean checkEvictions(long updateSeq, List<List<ClusterNode>> aff) {
-        if (!ctx.kernalContext().state().active())
-            return false;
-
         boolean changed = false;
 
         UUID locId = ctx.localNodeId();

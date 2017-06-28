@@ -80,9 +80,10 @@ public abstract class GridDhtTopologyFutureAdapter extends GridFutureAdapter<Aff
         if (err != null)
             return err;
 
-        if (!cctx.shared().kernalContext().state().active())
-            return new CacheInvalidStateException(
-                "Failed to perform cache operation (cluster is not activated): " + cctx.name());
+// TODO GG-12389.
+//        if (!cctx.shared().kernalContext().state().active())
+//            return new CacheInvalidStateException(
+//                "Failed to perform cache operation (cluster is not activated): " + cctx.name());
 
         CacheGroupContext grp = cctx.group();
 

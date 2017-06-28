@@ -152,7 +152,7 @@ public class NoOpPageStoreManager implements IgnitePageStoreManager {
     }
 
     /** {@inheritDoc} */
-    @Override public void onKernalStart(boolean reconnect) throws IgniteCheckedException {
+    @Override public void onKernalStart(boolean active, boolean reconnect) throws IgniteCheckedException {
         // No-op.
     }
 

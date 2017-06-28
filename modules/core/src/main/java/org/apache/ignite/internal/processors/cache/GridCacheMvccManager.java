@@ -275,7 +275,7 @@ public class GridCacheMvccManager extends GridCacheSharedManagerAdapter {
     }
 
     /** {@inheritDoc} */
-    @Override protected void onKernalStart0(boolean reconnect) throws IgniteCheckedException {
+    @Override protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
         if (!reconnect)
             cctx.gridEvents().addLocalEventListener(discoLsnr, EVT_NODE_FAILED, EVT_NODE_LEFT);
     }

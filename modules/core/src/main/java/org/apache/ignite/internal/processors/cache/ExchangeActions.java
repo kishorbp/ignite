@@ -50,7 +50,7 @@ public class ExchangeActions {
     private Map<String, ActionData> cachesToResetLostParts;
 
     /** */
-    private ClusterState newState;
+    private StateChangeRequest stateChangeReq;
 
     /**
      * @return {@code True} if server nodes should not participate in exchange.
@@ -161,19 +161,17 @@ public class ExchangeActions {
     }
 
     /**
-     * @param state New cluster state.
+     * @param stateChange Cluster state change request.
      */
-    void newClusterState(ClusterState state) {
-        assert state != null;
-
-        newState = state;
+    public void stateChangeRequest(StateChangeRequest stateChange) {
+        this.stateChangeReq = stateChange;
     }
 
     /**
-     * @return New cluster state if state change was requested.
+     * @return Cluster state change request.
      */
-    @Nullable public ClusterState newClusterState() {
-        return newState;
+    @Nullable public StateChangeRequest stateChangeRequest() {
+        return stateChangeReq;
     }
 
     /**
@@ -304,7 +302,8 @@ public class ExchangeActions {
             F.isEmpty(cachesToStop) &&
             F.isEmpty(cacheGrpsToStart) &&
             F.isEmpty(cacheGrpsToStop) &&
-            F.isEmpty(cachesToResetLostParts);
+            F.isEmpty(cachesToResetLostParts) &&
+            stateChangeReq == null;
     }
 
     /**
@@ -362,6 +361,6 @@ public class ExchangeActions {
             ", startGrps=" + startGrps +
             ", stopGrps=" + stopGrps +
             ", resetParts=" + (cachesToResetLostParts != null ? cachesToResetLostParts.keySet() : null) +
-            ", newState=" + newState + ']';
+            ", stateChangeRequest=" + stateChangeReq + ']';
     }
 }

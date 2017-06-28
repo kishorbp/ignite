@@ -40,6 +40,7 @@ import org.apache.ignite.configuration.NearCacheConfiguration;
 import org.apache.ignite.internal.GridKernalContext;
 import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
+import org.apache.ignite.internal.processors.cluster.DiscoveryDataClusterState;
 import org.apache.ignite.internal.processors.query.QuerySchema;
 import org.apache.ignite.internal.processors.query.QueryUtils;
 import org.apache.ignite.internal.processors.query.schema.SchemaOperationException;
@@ -94,9 +95,6 @@ class ClusterCachesInfo {
     /** */
     private Map<UUID, CacheClientReconnectDiscoveryData> clientReconnectReqs;
 
-    /** */
-    private volatile Exception onJoinCacheException;
-
     /**
      * @param ctx Context.
      */
@@ -112,14 +110,25 @@ class ClusterCachesInfo {
      */
     void onStart(CacheJoinNodeDiscoveryData joinDiscoData) throws IgniteCheckedException {
         this.joinDiscoData = joinDiscoData;
-    }
 
-    /**
-     *
-     * @return Exception if cache has conflict.
-     */
-    Exception onJoinCacheException(){
-        return onJoinCacheException;
+        Map<String, CacheConfiguration> grpCfgs = new HashMap<>();
+
+        for (CacheJoinNodeDiscoveryData.CacheInfo info : joinDiscoData.caches().values()) {
+            if (info.cacheData().config().getGroupName() == null)
+                continue;
+
+            CacheConfiguration ccfg = grpCfgs.get(info.cacheData().config().getGroupName());
+
+            if (ccfg == null)
+                grpCfgs.put(info.cacheData().config().getGroupName(), info.cacheData().config());
+            else
+                validateCacheGroupConfiguration(ccfg, info.cacheData().config());
+        }
+
+        String conflictErr = processJoiningNode(joinDiscoData, ctx.localNodeId(), true);
+
+        if (conflictErr != null)
+            throw new IgniteCheckedException("Failed to start configured cache. " + conflictErr);
     }
 
     /**
@@ -167,6 +176,7 @@ class ClusterCachesInfo {
         joinDiscoData = null;
         gridData = null;
     }
+
     /**
      * Checks that remote caches has configuration compatible with the local.
      *
@@ -314,6 +324,7 @@ class ClusterCachesInfo {
      * @return {@code True} if minor topology version should be increased.
      */
     boolean onCacheChangeRequested(DynamicCacheChangeBatch batch, AffinityTopologyVersion topVer) {
+        // TODO GG-12389 fail if no active (for others msgs too).
         ExchangeActions exchangeActions = new ExchangeActions();
 
         boolean incMinorTopVer = false;
@@ -356,7 +367,7 @@ class ClusterCachesInfo {
 
             assert !req.clientStartOnly() : req;
 
-            DynamicCacheDescriptor desc = req.globalStateChange() ? null : registeredCaches.get(req.cacheName());
+            DynamicCacheDescriptor desc = registeredCaches.get(req.cacheName());
 
             boolean needExchange = false;
 
@@ -488,8 +499,6 @@ class ClusterCachesInfo {
                     }
                 }
             }
-            else if (req.globalStateChange())
-                exchangeActions.newClusterState(req.state());
             else if (req.resetLostPartitions()) {
                 if (desc != null) {
                     needExchange = true;
@@ -547,7 +556,7 @@ class ClusterCachesInfo {
                 assert false : req;
 
             if (!needExchange) {
-                if (!clientCacheStart && req.initiatingNodeId().equals(ctx.localNodeId()))
+                if (!clientCacheStart && ctx.localNodeId().equals(req.initiatingNodeId()))
                     reqsToComplete.add(new T2<>(req, waitTopVer));
             }
             else
@@ -657,7 +666,7 @@ class ClusterCachesInfo {
             return new CacheClientReconnectDiscoveryData(cacheGrpsInfo, cachesInfo);
         }
         else {
-            assert ctx.config().isDaemon() || joinDiscoData != null || !ctx.state().active();
+            assert ctx.config().isDaemon() || joinDiscoData != null;
 
             return joinDiscoData;
         }
@@ -708,31 +717,6 @@ class ClusterCachesInfo {
         return started != null ? started : Collections.<DynamicCacheDescriptor>emptyList();
     }
 
-    public void addJoinInfo() {
-        try {
-            Map<String, CacheConfiguration> grpCfgs = new HashMap<>();
-
-            for (CacheJoinNodeDiscoveryData.CacheInfo info : joinDiscoData.caches().values()) {
-                if (info.cacheData().config().getGroupName() == null)
-                    continue;
-
-                CacheConfiguration ccfg = grpCfgs.get(info.cacheData().config().getGroupName());
-
-                if (ccfg == null)
-                    grpCfgs.put(info.cacheData().config().getGroupName(), info.cacheData().config());
-                else
-                    validateCacheGroupConfiguration(ccfg, info.cacheData().config());
-            }
-
-            String conflictErr = processJoiningNode(joinDiscoData, ctx.localNodeId(), true);
-
-            if (conflictErr != null)
-                onJoinCacheException = new IgniteCheckedException("Failed to start configured cache. " + conflictErr);
-        }catch (IgniteCheckedException e){
-            onJoinCacheException = e;
-        }
-    }
-
     /**
      * Discovery event callback, executed from discovery thread.
      *
@@ -759,10 +743,7 @@ class ClusterCachesInfo {
 
             if (node.id().equals(ctx.discovery().localNode().id())) {
                 if (gridData == null) { // First node starts.
-                    assert joinDiscoData != null || !ctx.state().active();
-
-                    if (ctx.state().active())
-                        addJoinInfo();
+                    assert joinDiscoData != null;
 
                     initStartCachesForLocalJoin(true);
                 }
@@ -852,7 +833,7 @@ class ClusterCachesInfo {
         if (ctx.isDaemon() || data.commonData() == null)
             return;
 
-        assert joinDiscoData != null || disconnectedState() || !ctx.state().active();
+        assert joinDiscoData != null || disconnectedState();
         assert data.commonData() instanceof CacheNodeCommonDiscoveryData : data;
 
         CacheNodeCommonDiscoveryData cachesData = (CacheNodeCommonDiscoveryData)data.commonData();
@@ -961,6 +942,9 @@ class ClusterCachesInfo {
             locJoinStartCaches = Collections.emptyList();
     }
 
+    /** */
+    private Map<String, T2<CacheConfiguration, NearCacheConfiguration>> locCfgsForActivation;
+
     /**
      * @param firstNode {@code True} if first node in cluster starts.
      */
@@ -968,8 +952,12 @@ class ClusterCachesInfo {
         assert locJoinStartCaches == null;
 
         locJoinStartCaches = new ArrayList<>();
+        locCfgsForActivation = new HashMap<>();
 
         if (joinDiscoData != null) {
+            // TODO GG-12389 handle transition.
+           boolean active = ctx.state().clusterState().active();
+
             for (DynamicCacheDescriptor desc : registeredCaches.values()) {
                 if (firstNode && !joinDiscoData.caches().containsKey(desc.cacheName()))
                     continue;
@@ -985,13 +973,13 @@ class ClusterCachesInfo {
 
                     DynamicCacheDescriptor desc0 = new DynamicCacheDescriptor(ctx,
                         locCfg.cacheData().config(),
-                            desc.cacheType(),
-                            desc.groupDescriptor(),
-                            desc.template(),
-                            desc.receivedFrom(),
-                            desc.staticallyConfigured(),
-                            desc.sql(),
-                            desc.deploymentId(),
+                        desc.cacheType(),
+                        desc.groupDescriptor(),
+                        desc.template(),
+                        desc.receivedFrom(),
+                        desc.staticallyConfigured(),
+                        desc.sql(),
+                        desc.deploymentId(),
                         new QuerySchema(locCfg.cacheData().queryEntities()));
 
                     desc0.startTopologyVersion(desc.startTopologyVersion());
@@ -1004,13 +992,56 @@ class ClusterCachesInfo {
                 if (locCfg != null ||
                     joinDiscoData.startCaches() ||
                     CU.affinityNode(ctx.discovery().localNode(), desc.groupDescriptor().config().getNodeFilter())) {
-                    // Move system and internal caches first.
-                    if (desc.cacheType().userCache())
-                        locJoinStartCaches.add(new T2<>(desc, nearCfg));
+                    if (active) {
+                        // Move system and internal caches first.
+                        if (desc.cacheType().userCache())
+                            locJoinStartCaches.add(new T2<>(desc, nearCfg));
+                        else
+                            locJoinStartCaches.add(0, new T2<>(desc, nearCfg));
+                    }
                     else
-                        locJoinStartCaches.add(0, new T2<>(desc, nearCfg));
+                        locCfgsForActivation.put(desc.cacheName(), new T2<>(desc.cacheConfiguration(), nearCfg));
                 }
             }
+        }
+    }
+
+    /**
+     * @param exchangeActions Exchange actions to modify.
+     */
+    void onStateChangeRequest(ExchangeActions exchangeActions) {
+        StateChangeRequest stateChangeReq = exchangeActions.stateChangeRequest();
+
+        assert stateChangeReq != null : exchangeActions;
+
+        if (stateChangeReq.activate()) {
+            for (DynamicCacheDescriptor desc : registeredCaches.values()) {
+                desc.startTopologyVersion(stateChangeReq.topologyVersion());
+
+                T2<CacheConfiguration, NearCacheConfiguration> locCfg =
+                    locCfgsForActivation.get(desc.cacheName());
+
+                DynamicCacheChangeRequest req = new DynamicCacheChangeRequest(stateChangeReq.requestId(),
+                    desc.cacheName(),
+                    locCfg != null ? ctx.localNodeId() : null);
+
+                req.startCacheConfiguration(desc.cacheConfiguration());
+
+                if (locCfg != null) {
+                    if (locCfg.get1() != null)
+                        req.startCacheConfiguration(locCfg.get1());
+
+                    req.nearCacheConfiguration(locCfg.get2());
+                }
+
+                exchangeActions.addCacheToStart(req, desc);
+            }
+
+            for (CacheGroupDescriptor grpDesc : registeredCacheGroups().values())
+                exchangeActions.addCacheGroupToStart(grpDesc);
+        }
+        else {
+            // TODO GG-12389.
         }
     }
 
@@ -1411,7 +1442,7 @@ class ClusterCachesInfo {
 
             boolean stopped;
 
-            if (!surviveReconnect(cacheName) || !ctx.state().active()) {
+            if (!surviveReconnect(cacheName)) {
                 DynamicCacheDescriptor newDesc = registeredCaches.get(cacheName);
 
                 stopped = newDesc == null || !desc.deploymentId().equals(newDesc.deploymentId());
@@ -1438,7 +1469,7 @@ class ClusterCachesInfo {
     /**
      * @return {@code True} if client node is currently in disconnected state.
      */
-    public boolean disconnectedState() {
+    private boolean disconnectedState() {
         return cachesOnDisconnect != null;
     }
 

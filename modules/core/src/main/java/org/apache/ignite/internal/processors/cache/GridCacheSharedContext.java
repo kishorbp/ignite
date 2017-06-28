@@ -277,7 +277,7 @@ public class GridCacheSharedContext<K, V> {
     /**
      * @throws IgniteCheckedException If failed.
      */
-    void onReconnected() throws IgniteCheckedException {
+    void onReconnected(boolean active) throws IgniteCheckedException {
         List<GridCacheSharedManager<K, V>> mgrs = new LinkedList<>();
 
         setManagers(mgrs, txMgr,
@@ -304,7 +304,7 @@ public class GridCacheSharedContext<K, V> {
         kernalCtx.query().onCacheReconnect();
 
         for (GridCacheSharedManager<?, ?> mgr : mgrs)
-            mgr.onKernalStart(true);
+            mgr.onKernalStart(active, true);
     }
 
     /**

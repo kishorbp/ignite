@@ -112,8 +112,8 @@ public class GridCacheSharedManagerAdapter<K, V> implements GridCacheSharedManag
     }
 
     /** {@inheritDoc} */
-    @Override public final void onKernalStart(boolean reconnect) throws IgniteCheckedException {
-        onKernalStart0(reconnect);
+    @Override public final void onKernalStart(boolean active, boolean reconnect) throws IgniteCheckedException {
+        onKernalStart0(active, reconnect);
 
         if (!reconnect && log != null && log.isDebugEnabled())
             log.debug(kernalStartInfo());
@@ -135,7 +135,7 @@ public class GridCacheSharedManagerAdapter<K, V> implements GridCacheSharedManag
      * @param reconnect {@code True} if manager restarted after client reconnect.
      * @throws IgniteCheckedException If failed.
      */
-    protected void onKernalStart0(boolean reconnect) throws IgniteCheckedException {
+    protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
         // No-op.
     }
 

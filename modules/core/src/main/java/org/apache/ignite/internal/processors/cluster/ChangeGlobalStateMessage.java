@@ -15,10 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.ignite.internal.processors.cache;
+package org.apache.ignite.internal.processors.cluster;
 
 import java.util.UUID;
 import org.apache.ignite.internal.managers.discovery.DiscoveryCustomMessage;
+import org.apache.ignite.internal.processors.cache.ExchangeActions;
 import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.lang.IgniteUuid;
 import org.jetbrains.annotations.Nullable;
@@ -42,11 +43,8 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     /** If true activate else deactivate. */
     private boolean activate;
 
-    /** Batch contains all requests for start or stop caches. */
-    private DynamicCacheChangeBatch changeGlobalStateBatch;
-
-    /** If happened concurrent activate/deactivate then processed only first message, other message must be skip. */
-    private boolean concurrentChangeState;
+    /** */
+    private transient ExchangeActions exchangeActions;
 
     /**
      *
@@ -54,20 +52,27 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     public ChangeGlobalStateMessage(
         UUID requestId,
         UUID initiatingNodeId,
-        boolean activate,
-        DynamicCacheChangeBatch changeGlobalStateBatch
+        boolean activate
     ) {
         this.requestId = requestId;
         this.initiatingNodeId = initiatingNodeId;
         this.activate = activate;
-        this.changeGlobalStateBatch = changeGlobalStateBatch;
     }
 
     /**
-     *
+     * @return Cache updates to be executed on exchange.
      */
-    public DynamicCacheChangeBatch getDynamicCacheChangeBatch() {
-        return changeGlobalStateBatch;
+    public ExchangeActions exchangeActions() {
+        return exchangeActions;
+    }
+
+    /**
+     * @param exchangeActions Cache updates to be executed on exchange.
+     */
+    public void exchangeActions(ExchangeActions exchangeActions) {
+        assert exchangeActions != null && !exchangeActions.empty() : exchangeActions;
+
+        this.exchangeActions = exchangeActions;
     }
 
     /** {@inheritDoc} */
@@ -77,7 +82,7 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
 
     /** {@inheritDoc} */
     @Nullable @Override public DiscoveryCustomMessage ackMessage() {
-        return !concurrentChangeState ? changeGlobalStateBatch : null;
+        return null;
     }
 
     /** {@inheritDoc} */
@@ -85,7 +90,7 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
         return false;
     }
 
-    /**
+   /**
      *
      */
     public UUID initiatorNodeId() {
@@ -104,13 +109,6 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
      */
     public UUID requestId() {
         return requestId;
-    }
-
-    /**
-     *
-     */
-    public void concurrentChangeState() {
-        this.concurrentChangeState = true;
     }
 
     /** {@inheritDoc} */
