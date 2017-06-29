@@ -393,40 +393,27 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
      *
      */
     private Exception onActivate(AffinityTopologyVersion topVer) {
-        final boolean client = ctx.clientNode();
-
-        if (log.isInfoEnabled())
-            log.info("Start activation process [nodeId=" + ctx.localNodeId() + ", client=" + client +
+        if (log.isInfoEnabled()) {
+            log.info("Start activation process [nodeId=" + ctx.localNodeId() +
+                ", client=" + ctx.clientNode() +
                 ", topVer=" + topVer + "]");
+        }
 
         try {
-            if (!client)
-                sharedCtx.database().lock();
+            sharedCtx.activate();
 
-            IgnitePageStoreManager pageStore = sharedCtx.pageStore();
-
-            if (pageStore != null)
-                pageStore.onActivate(ctx);
-
-            if (sharedCtx.wal() != null)
-                sharedCtx.wal().onActivate(ctx);
-
-            sharedCtx.database().onActivate(ctx);
-
-            sharedCtx.snapshot().onActivate(ctx);
-
-            if (log.isInfoEnabled())
-                log.info("Successfully activated persistence managers [nodeId="
-                    + ctx.localNodeId() + ", client=" + client + ", topVer=" + topVer + "]");
+            if (log.isInfoEnabled()) {
+                log.info("Successfully activated persistence managers [nodeId=" + ctx.localNodeId() +
+                    ", client=" + ctx.clientNode() +
+                    ", topVer=" + topVer + "]");
+            }
 
             return null;
         }
         catch (Exception e) {
-            U.error(log, "Failed to activate persistence managers [nodeId=" + ctx.localNodeId() + ", client=" + client +
+            U.error(log, "Failed to activate persistence managers [nodeId=" + ctx.localNodeId() +
+                ", client=" + ctx.clientNode() +
                 ", topVer=" + topVer + "]", e);
-
-            if (!client)
-                sharedCtx.database().unLock();
 
             return e;
         }
@@ -508,15 +495,7 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
         Exception ex = null;
 
         try {
-            sharedCtx.snapshot().onDeActivate(ctx);
-
-            sharedCtx.database().onDeActivate(ctx);
-
-            if (sharedCtx.pageStore() != null)
-                sharedCtx.pageStore().onDeActivate(ctx);
-
-            if (sharedCtx.wal() != null)
-                sharedCtx.wal().onDeActivate(ctx);
+            sharedCtx.deactivate();
 
             sharedCtx.affinity().removeAllCacheInfo();
         }

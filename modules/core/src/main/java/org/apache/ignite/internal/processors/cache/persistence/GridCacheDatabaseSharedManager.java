@@ -352,6 +352,8 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
 
     /** {@inheritDoc} */
     @Override protected void start0() throws IgniteCheckedException {
+        super.start0();
+
         snapshotMgr = cctx.snapshot();
 
         if (!cctx.kernalContext().clientNode()) {
@@ -369,15 +371,13 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
             fileLockHolder = new FileLockHolder(storeMgr.workDir().getPath(), cctx.kernalContext(), log);
 
             persStoreMetrics.wal(cctx.wal());
-
-            registrateMetricsMBean();
         }
     }
 
     /**
-     *
+     * @throws IgniteCheckedException If failed.
      */
-    @Override public void initDataBase() throws IgniteCheckedException {
+    private void initDataBase() throws IgniteCheckedException {
         Long cpBufSize = persistenceCfg.getCheckpointingPageBufferSize();
 
         if (persistenceCfg.getCheckpointingThreads() > 1)
@@ -430,23 +430,11 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
         }
 
         checkpointPageBufSize = cpBufSize;
-
-        super.start0();
     }
 
     /** {@inheritDoc} */
     @Override protected void initPageMemoryDataStructures(MemoryConfiguration dbCfg) throws IgniteCheckedException {
         // No-op.
-    }
-
-    /** {@inheritDoc} */
-    @Override protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
-        if (reconnect || cctx.kernalContext().clientNode() || !active)
-            return;
-
-        initDataBase();
-
-        initCachesAndRestoreMemory();
     }
 
     /**
@@ -491,7 +479,9 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
     }
 
     /** {@inheritDoc} */
-    @Override public void onActivate(GridKernalContext kctx) throws IgniteCheckedException {
+    @Override public void onActivate(GridKernalContext ctx) throws IgniteCheckedException {
+        super.onActivate(ctx);
+
         if (log.isDebugEnabled())
             log.debug("Activate database manager [id=" + cctx.localNodeId() +
                 " topVer=" + cctx.discovery().topologyVersionEx() + " ]");

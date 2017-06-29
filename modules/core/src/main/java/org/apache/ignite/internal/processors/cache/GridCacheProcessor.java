@@ -835,17 +835,9 @@ public class GridCacheProcessor extends GridProcessorAdapter {
             if (active && !ctx.clientNode() && !ctx.isDaemon())
                 sharedCtx.database().lock();
 
-            // Must start database before start first cache.
-            sharedCtx.database().onKernalStart(active, false);
-
             ctx.query().onCacheKernalStart();
 
-            // In shared context, we start exchange manager and wait until processed local join
-            // event, all caches which we get on join will be start.
-            for (GridCacheSharedManager<?, ?> mgr : sharedCtx.managers()) {
-                if (sharedCtx.database() != mgr)
-                    mgr.onKernalStart(active, false);
-            }
+            sharedCtx.exchange().onKernalStart(active, false);
         }
         finally {
             cacheStartedLatch.countDown();

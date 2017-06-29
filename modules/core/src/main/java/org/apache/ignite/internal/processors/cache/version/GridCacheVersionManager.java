@@ -88,10 +88,10 @@ public class GridCacheVersionManager extends GridCacheSharedManagerAdapter {
     }
 
     /** {@inheritDoc} */
-    @Override protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
-        for (ClusterNode n : cctx.discovery().remoteNodes())
-            onReceived(n.id(), n.metrics().getLastDataVersion());
-    }
+//    @Override protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
+//        for (ClusterNode n : cctx.discovery().remoteNodes())
+//            onReceived(n.id(), n.metrics().getLastDataVersion());
+//    }
 
     /** {@inheritDoc} */
     @Override protected void stop0(boolean cancel) {

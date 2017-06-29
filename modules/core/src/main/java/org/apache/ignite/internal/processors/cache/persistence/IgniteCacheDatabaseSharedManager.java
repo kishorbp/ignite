@@ -100,13 +100,6 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
         if (cctx.kernalContext().clientNode() && cctx.kernalContext().config().getMemoryConfiguration() == null)
             return;
 
-        init();
-    }
-
-    /**
-     * @throws IgniteCheckedException If failed.
-     */
-    public void init() throws IgniteCheckedException {
         MemoryConfiguration memCfg = cctx.kernalContext().config().getMemoryConfiguration();
 
         assert memCfg != null;
@@ -114,14 +107,6 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
         validateConfiguration(memCfg);
 
         pageSize = memCfg.getPageSize();
-
-        initPageMemoryPolicies(memCfg);
-
-        registerMetricsMBeans();
-
-        startMemoryPolicies();
-
-        initPageMemoryDataStructures(memCfg);
     }
 
     /**
@@ -554,13 +539,6 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
     }
 
     /**
-     * @throws IgniteCheckedException If failed.
-     */
-    public void initDataBase() throws IgniteCheckedException {
-        // No-op.
-    }
-
-    /**
      * @return collection of all configured {@link MemoryPolicy policies}.
      */
     public Collection<MemoryPolicy> memoryPolicies() {
@@ -947,7 +925,17 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
 
     /** {@inheritDoc} */
     @Override public void onActivate(GridKernalContext kctx) throws IgniteCheckedException {
-        start0();
+        MemoryConfiguration memCfg = cctx.kernalContext().config().getMemoryConfiguration();
+
+        assert memCfg != null;
+
+        initPageMemoryPolicies(memCfg);
+
+        registerMetricsMBeans();
+
+        startMemoryPolicies();
+
+        initPageMemoryDataStructures(memCfg);
     }
 
     /** {@inheritDoc} */

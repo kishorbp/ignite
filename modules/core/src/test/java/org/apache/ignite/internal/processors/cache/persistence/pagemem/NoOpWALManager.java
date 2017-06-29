@@ -92,11 +92,6 @@ public class NoOpWALManager implements IgniteWriteAheadLogManager {
     }
 
     /** {@inheritDoc} */
-    @Override public void onKernalStart(boolean active, boolean reconnect) throws IgniteCheckedException {
-
-    }
-
-    /** {@inheritDoc} */
     @Override public void onKernalStop(boolean cancel) {
 
     }

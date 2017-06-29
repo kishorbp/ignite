@@ -73,6 +73,7 @@ import org.apache.ignite.internal.processors.cache.distributed.dht.GridDhtPartit
 import org.apache.ignite.internal.processors.cache.distributed.dht.GridDhtPartitionTopology;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteTxKey;
 import org.apache.ignite.internal.processors.cache.version.GridCacheVersion;
+import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateFinishMessage;
 import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateMessage;
 import org.apache.ignite.internal.processors.timeout.GridTimeoutObjectAdapter;
 import org.apache.ignite.internal.util.future.GridCompoundFuture;
@@ -608,8 +609,11 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
                         cctx.affinity().initStartedCaches(crdNode, this, receivedCaches);
                     }
-                    else
+                    else {
+                        cctx.activate();
+
                         cctx.cache().startCachesOnLocalJoin(topVer);
+                    }
                 }
 
                 exchange = CU.clientNode(discoEvt.eventNode()) ?
@@ -1818,13 +1822,22 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                     nodes = new ArrayList<>(srvNodes);
                 }
 
+                if (stateChangeExchange()) {
+                    StateChangeRequest req = exchActions.stateChangeRequest();
+
+                    assert req != null : exchActions;
+
+                    if (!F.isEmpty(changeGlobalStateExceptions))
+                        cctx.kernalContext().state().onStateChangeError(changeGlobalStateExceptions, req);
+
+                    ChangeGlobalStateFinishMessage msg = new ChangeGlobalStateFinishMessage(req.requestId(),
+                        req.activate());
+
+                    cctx.discovery().sendCustomEvent(msg);
+                }
+
                 if (!nodes.isEmpty())
                     sendAllPartitions(nodes);
-
-                if (stateChangeExchange() && !F.isEmpty(changeGlobalStateExceptions)) {
-                    cctx.kernalContext().state().onStateChangeError(changeGlobalStateExceptions,
-                        exchActions.stateChangeRequest());
-                }
 
                 onDone(exchangeId().topologyVersion());
             }

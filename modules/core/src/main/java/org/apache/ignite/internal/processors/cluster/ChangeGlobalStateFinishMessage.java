@@ -17,6 +17,7 @@
 
 package org.apache.ignite.internal.processors.cluster;
 
+import java.util.UUID;
 import org.apache.ignite.internal.managers.discovery.DiscoveryCustomMessage;
 import org.apache.ignite.lang.IgniteUuid;
 import org.jetbrains.annotations.Nullable;
@@ -30,6 +31,25 @@ public class ChangeGlobalStateFinishMessage implements DiscoveryCustomMessage {
 
     /** Custom message ID. */
     private IgniteUuid id = IgniteUuid.randomUuid();
+
+    /** */
+    private UUID reqId;
+
+    /** */
+    private boolean clusterActive;
+
+    public ChangeGlobalStateFinishMessage(UUID reqId, boolean clusterActive) {
+        this.reqId = reqId;
+        this.clusterActive = clusterActive;
+    }
+
+    public UUID requestId() {
+        return reqId;
+    }
+
+    public boolean clusterActive() {
+        return clusterActive;
+    }
 
     /** {@inheritDoc} */
     @Override public IgniteUuid id() {

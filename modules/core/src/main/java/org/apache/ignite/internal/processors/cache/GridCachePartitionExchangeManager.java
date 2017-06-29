@@ -384,10 +384,7 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
         return exchangeId(cctx.localNode().id(), startTopVer, EVT_NODE_JOINED);
     }
 
-    /** {@inheritDoc} */
-    @Override protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
-        super.onKernalStart0(active, reconnect);
-
+    public void onKernalStart(boolean active, boolean reconnect) throws IgniteCheckedException {
         ClusterNode loc = cctx.localNode();
 
         long startTime = loc.metrics().getStartTime();
