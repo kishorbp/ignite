@@ -278,7 +278,7 @@ public final class DataStructuresProcessor extends GridProcessorAdapter implemen
     }
 
     /** {@inheritDoc} */
-    @Override public void onDeActivate(GridKernalContext ctx) throws IgniteCheckedException {
+    @Override public void onDeActivate(GridKernalContext ctx) {
         if (log.isDebugEnabled())
             log.debug("DeActivate data structure processor [nodeId=" + ctx.localNodeId() +
                 " topVer=" + ctx.discovery().topologyVersionEx() + " ]");

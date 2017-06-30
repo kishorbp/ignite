@@ -191,6 +191,20 @@ public class ExchangeActions {
     }
 
     /**
+     * @return {@code True} if has deactivate request.
+     */
+    public boolean deactivate() {
+        return stateChangeReq != null && !stateChangeReq.activate();
+    }
+
+    /**
+     * @return {@code True} if has activate request.
+     */
+    public boolean activate() {
+        return stateChangeReq != null && stateChangeReq.activate();
+    }
+
+    /**
      * @return Cluster state change request.
      */
     @Nullable public StateChangeRequest stateChangeRequest() {

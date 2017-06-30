@@ -162,7 +162,7 @@ public class FilePageStoreManager extends GridCacheSharedManagerAdapter implemen
     }
 
     /** {@inheritDoc} */
-    @Override public void onDeActivate(GridKernalContext kctx) throws IgniteCheckedException {
+    @Override public void onDeActivate(GridKernalContext kctx) {
         if (log.isDebugEnabled())
             log.debug("DeActivate page store manager [id=" + cctx.localNodeId() +
                 " topVer=" + cctx.discovery().topologyVersionEx() + " ]");

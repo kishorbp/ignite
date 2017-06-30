@@ -942,7 +942,7 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
     }
 
     /** {@inheritDoc} */
-    @Override public void onDeActivate(GridKernalContext kctx) throws IgniteCheckedException {
+    @Override public void onDeActivate(GridKernalContext kctx) {
         stop0(false);
     }
 

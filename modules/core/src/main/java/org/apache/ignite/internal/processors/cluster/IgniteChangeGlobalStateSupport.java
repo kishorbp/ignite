@@ -38,5 +38,5 @@ public interface IgniteChangeGlobalStateSupport {
      * @param kctx Kernal context.
      * @throws IgniteCheckedException If failed.
      */
-    public void onDeActivate(GridKernalContext kctx) throws IgniteCheckedException;
+    public void onDeActivate(GridKernalContext kctx);
 }

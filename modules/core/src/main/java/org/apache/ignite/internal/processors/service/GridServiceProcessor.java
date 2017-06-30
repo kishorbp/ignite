@@ -363,7 +363,7 @@ public class GridServiceProcessor extends GridProcessorAdapter implements Ignite
     }
 
     /** {@inheritDoc} */
-    @Override public void onDeActivate(GridKernalContext kctx) throws IgniteCheckedException {
+    @Override public void onDeActivate(GridKernalContext kctx) {
         if (log.isDebugEnabled())
             log.debug("DeActivate service processor [nodeId=" + ctx.localNodeId() +
                 " topVer=" + ctx.discovery().topologyVersionEx() + " ]");

@@ -251,7 +251,7 @@ public class GridCacheSharedContext<K, V> {
     /**
      * @throws IgniteCheckedException If failed.
      */
-    public void deactivate() throws IgniteCheckedException {
+    public void deactivate() {
         for (int i = stateAwareMgrs.size() - 1; i >= 0; i--)
             stateAwareMgrs.get(i).onDeActivate(kernalCtx);
     }

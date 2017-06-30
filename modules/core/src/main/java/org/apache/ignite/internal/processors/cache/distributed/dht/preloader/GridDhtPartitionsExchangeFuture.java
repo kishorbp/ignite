@@ -464,29 +464,17 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
     }
 
     /**
-     *
+     * @return {@code True} if activate cluster exchange.
      */
     public boolean activateCluster() {
-        if (exchActions != null) {
-            StateChangeRequest req = exchActions.stateChangeRequest();
-
-            return req != null && req.activate();
-        }
-
-        return false;
+        return exchActions != null && exchActions.activate();
     }
 
     /**
-     *
+     * @return {@code True} if deactivate cluster exchange.
      */
-    public boolean deactivateCluster() {
-        if (exchActions != null) {
-            StateChangeRequest req = exchActions.stateChangeRequest();
-
-            return req != null && !req.activate();
-        }
-
-        return false;
+    boolean deactivateCluster() {
+        return exchActions != null && exchActions.deactivate();
     }
 
     /**
@@ -787,8 +775,6 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                 cctx.kernalContext().service().onDeActivate(cctx.kernalContext());
 
                 cctx.affinity().onCacheChangeRequest(this, crd, exchActions);
-
-                cctx.deactivate();
 
                 if (log.isInfoEnabled()) {
                     log.info("Successfully deactivated data structures, services and caches [" +

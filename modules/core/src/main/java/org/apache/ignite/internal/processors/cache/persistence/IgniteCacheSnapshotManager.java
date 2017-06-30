@@ -131,10 +131,10 @@ public class IgniteCacheSnapshotManager extends GridCacheSharedManagerAdapter im
     }
 
     @Override public void onActivate(GridKernalContext kctx) throws IgniteCheckedException {
-
+        // No-op.
     }
 
-    @Override public void onDeActivate(GridKernalContext kctx) throws IgniteCheckedException {
-
+    @Override public void onDeActivate(GridKernalContext kctx) {
+        // No-op.
     }
 }

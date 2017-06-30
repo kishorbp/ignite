@@ -1079,7 +1079,7 @@ class ClusterCachesInfo {
             }
 
             for (CacheGroupDescriptor grpDesc : registeredCacheGroups().values())
-                exchangeActions.addCacheGroupToStop(grpDesc);
+                exchangeActions.addCacheGroupToStop(grpDesc, false);
         }
     }
 

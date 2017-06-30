@@ -411,6 +411,34 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     }
 
     /**
+     * @throws Exception If failed.
+     */
+    public void testDeactivateSimple_5_Servers() throws Exception {
+        deactivateSimple(5, 0, 0);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testDeactivateSimple_5_Servers2() throws Exception {
+        deactivateSimple(5, 0, 4);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testDeactivateSimple_5_Servers_5_Clients() throws Exception {
+        deactivateSimple(5, 4, 0);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testDeactivateSimple_5_Servers_5_Clients_FromClient() throws Exception {
+        deactivateSimple(5, 4, 6);
+    }
+
+    /**
      * @param srvs Number of servers.
      * @param clients Number of clients.
      * @param deactivateFrom Index of node stating deactivation.
