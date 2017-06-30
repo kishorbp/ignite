@@ -82,6 +82,7 @@ public class DiscoCache {
     private final Set<UUID> alives = new GridConcurrentHashSet<>();
 
     /**
+     * @param state Current cluster state.
      * @param loc Local node.
      * @param rmtNodes Remote nodes.
      * @param allNodes All nodes.

@@ -17,13 +17,9 @@
 
 package org.apache.ignite.internal.processors.cache;
 
-import java.util.Map;
 import java.util.UUID;
-import org.apache.ignite.configuration.CacheConfiguration;
-import org.apache.ignite.configuration.NearCacheConfiguration;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateMessage;
-import org.apache.ignite.internal.util.typedef.T2;
 
 /**
  *

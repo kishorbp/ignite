@@ -111,6 +111,9 @@ public class CacheAffinitySharedManager<K, V> extends GridCacheSharedManagerAdap
     /** */
     private final ThreadLocal<ClientCacheChangeDiscoveryMessage> clientCacheChanges = new ThreadLocal<>();
 
+    /** */
+    private boolean cachesInitialized;
+
     /** Discovery listener. */
     private final GridLocalEventListener discoLsnr = new GridLocalEventListener() {
         @Override public void onEvent(Event evt) {
@@ -139,9 +142,6 @@ public class CacheAffinitySharedManager<K, V> extends GridCacheSharedManagerAdap
         cctx.kernalContext().event().addLocalEventListener(discoLsnr, EVT_NODE_LEFT, EVT_NODE_FAILED);
     }
 
-    /** */
-    private boolean initCaches;
-
     /**
      * Callback invoked from discovery thread when discovery message is received.
      *
@@ -168,13 +168,13 @@ public class CacheAffinitySharedManager<K, V> extends GridCacheSharedManagerAdap
 
             caches.init(cctx.cache().cacheGroupDescriptors(), cctx.cache().cacheDescriptors());
 
-            initCaches = true;
+            cachesInitialized = true;
         }
         else if (customMsg instanceof ChangeGlobalStateFinishMessage) {
-            if (!initCaches && ((ChangeGlobalStateFinishMessage)customMsg).clusterActive()) {
+            if (!cachesInitialized && ((ChangeGlobalStateFinishMessage)customMsg).clusterActive()) {
                 caches.init(cctx.cache().cacheGroupDescriptors(), cctx.cache().cacheDescriptors());
 
-                initCaches = true;
+                cachesInitialized = true;
             }
         }
 
@@ -725,7 +725,7 @@ public class CacheAffinitySharedManager<K, V> extends GridCacheSharedManagerAdap
                 if (cacheProxy != null) {
                     // Cache should be in restarting mode
                     assert cacheProxy.isRestarting()
-                            : "Cache has non restarting proxy " + cacheProxy;
+                        : "Cache has non restarting proxy " + cacheProxy;
 
                     startCache = true;
                 }

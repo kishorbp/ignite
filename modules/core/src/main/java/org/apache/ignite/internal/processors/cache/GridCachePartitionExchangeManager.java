@@ -326,19 +326,8 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
 
                     assert cctx.discovery().node(n.id()) == null;
 
-                    // Avoid race b/w initial future add and discovery event.
-                    GridDhtPartitionsExchangeFuture initFut = null;
-
-                    if (readyTopVer.get().equals(AffinityTopologyVersion.NONE)) {
-                        initFut = exchangeFuture(initialExchangeId(), null, null, null, null);
-
-                        initFut.onNodeLeft(n);
-                    }
-
-                    for (GridDhtPartitionsExchangeFuture f : exchFuts.values()) {
-                        if (f != initFut)
-                            f.onNodeLeft(n);
-                    }
+                    for (GridDhtPartitionsExchangeFuture f : exchFuts.values())
+                        f.onNodeLeft(n);
 
                     // Notify indexing engine about node leave so that we can re-map coordinator accordingly.
                     exchWorker.addCustomTask(new SchemaNodeLeaveExchangeWorkerTask(evt.eventNode()));

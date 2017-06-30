@@ -93,6 +93,9 @@ class ClusterCachesInfo {
     private List<T2<DynamicCacheDescriptor, NearCacheConfiguration>> locJoinStartCaches;
 
     /** */
+    private Map<String, T2<CacheConfiguration, NearCacheConfiguration>> locCfgsForActivation;
+
+    /** */
     private Map<UUID, CacheClientReconnectDiscoveryData> clientReconnectReqs;
 
     /**
@@ -942,9 +945,6 @@ class ClusterCachesInfo {
             locJoinStartCaches = Collections.emptyList();
     }
 
-    /** */
-    private Map<String, T2<CacheConfiguration, NearCacheConfiguration>> locCfgsForActivation;
-
     /**
      * @param firstNode {@code True} if first node in cluster starts.
      */
@@ -955,8 +955,7 @@ class ClusterCachesInfo {
         locCfgsForActivation = new HashMap<>();
 
         if (joinDiscoData != null) {
-            // TODO GG-12389 handle transition.
-           boolean active = ctx.state().clusterState().active();
+           boolean active = ctx.state().clusterState().active() && !ctx.state().clusterState().transition();
 
             for (DynamicCacheDescriptor desc : registeredCaches.values()) {
                 if (firstNode && !joinDiscoData.caches().containsKey(desc.cacheName()))

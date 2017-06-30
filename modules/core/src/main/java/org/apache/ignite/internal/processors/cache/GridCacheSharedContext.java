@@ -225,6 +225,9 @@ public class GridCacheSharedContext<K, V> {
         stateAwareMgrs.add(snpMgr);
     }
 
+    /**
+     * @throws IgniteCheckedException If failed.
+     */
     public void activate() throws IgniteCheckedException {
         if (!kernalCtx.clientNode())
             dbMgr.lock();
@@ -245,6 +248,9 @@ public class GridCacheSharedContext<K, V> {
         }
     }
 
+    /**
+     * @throws IgniteCheckedException If failed.
+     */
     public void deactivate() throws IgniteCheckedException {
         for (int i = stateAwareMgrs.size() - 1; i >= 0; i--)
             stateAwareMgrs.get(i).onDeActivate(kernalCtx);
