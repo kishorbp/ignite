@@ -21,6 +21,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cluster.ClusterNode;
@@ -30,7 +31,9 @@ import org.apache.ignite.configuration.MemoryConfiguration;
 import org.apache.ignite.configuration.PersistentStoreConfiguration;
 import org.apache.ignite.configuration.WALMode;
 import org.apache.ignite.internal.IgniteInternalFuture;
+import org.apache.ignite.internal.IgniteKernal;
 import org.apache.ignite.internal.TestRecordingCommunicationSpi;
+import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cache.distributed.dht.preloader.GridDhtPartitionsSingleMessage;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.lang.IgniteBiPredicate;
@@ -157,7 +160,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     /**
      * @param srvs Number of servers.
      * @param clients Number of clients.
-     * @param activateFrom Index of node running activation.
+     * @param activateFrom Index of node stating activation.
      * @throws Exception If failed.
      */
     private void activateSimple(int srvs, int clients, int activateFrom) throws Exception {
@@ -165,25 +168,30 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
 
         final int CACHES = 2;
 
-        for (int i = 0; i < srvs; i++) {
-            client = false;
+        for (int i = 0; i < srvs + clients; i++) {
+            client = i >= srvs;
 
             ccfgs = cacheConfigurations1();
 
             startGrid(i);
+
+            checkNoCaches(i);
         }
 
-        for (int i = 0; i < clients; i++) {
-            client = true;
-
-            ccfgs = cacheConfigurations1();
-
-            startGrid(srvs + i);
-        }
+        for (int i = 0; i < srvs + clients; i++)
+            assertFalse(ignite(i).active());
 
         ignite(activateFrom).active(false); // Should be no-op.
 
         ignite(activateFrom).active(true);
+
+        for (int i = 0; i < srvs + clients; i++)
+            assertTrue(ignite(i).active());
+
+        for (int i = 0; i < srvs + clients; i++) {
+            for (int c = 0; c < 2; c++)
+                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+        }
 
         checkCaches(srvs + clients, CACHES);
 
@@ -191,11 +199,17 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
 
         startGrid(srvs + clients);
 
+        for (int c = 0; c < 2; c++)
+            checkCache(ignite(srvs + clients), CACHE_NAME_PREFIX + c, true);
+
         checkCaches(srvs + clients + 1, CACHES);
 
         client = true;
 
         startGrid(srvs + clients + 1);
+
+        for (int c = 0; c < 2; c++)
+            checkCache(ignite(srvs + clients + 1), CACHE_NAME_PREFIX + c, false);
 
         checkCaches(srvs + clients + 2, CACHES);
     }
@@ -225,11 +239,79 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     /**
      * @throws Exception If failed.
      */
-    public void testJoinWhileActivate1() throws Exception {
+    public void testJoinWhileActivate1_Server() throws Exception {
+        joinWhileActivate1(false, false);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testJoinWhileActivate1_WithCache_Server() throws Exception {
+        joinWhileActivate1(false, true);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testJoinWhileActivate1_Client() throws Exception {
+        joinWhileActivate1(true, false);
+    }
+
+    /**
+     * @param startClient If {@code true} joins client node, otherwise server.
+     * @param withNewCache If {@code true} joining node has new cache in configuration.
+     * @throws Exception If failed.
+     */
+    private void joinWhileActivate1(final boolean startClient, final boolean withNewCache) throws Exception {
+        IgniteInternalFuture<?> activeFut = startNodesAndBlockActivation(2, 0);
+
+        IgniteInternalFuture<?> startFut = GridTestUtils.runAsync(new Callable<Void>() {
+            @Override public Void call() throws Exception {
+                client = startClient;
+
+                ccfgs = withNewCache ? cacheConfigurations2() : cacheConfigurations1();
+
+                startGrid(2);
+
+                return null;
+            }
+        });
+
+        TestRecordingCommunicationSpi spi1 = TestRecordingCommunicationSpi.spi(ignite(1));
+
+        spi1.stopBlock();
+
+        activeFut.get();
+        startFut.get();
+
+        for (int c = 0; c < 2; c++)
+            checkCache(ignite(2), CACHE_NAME_PREFIX + c, true);
+
+        if (withNewCache) {
+            for (int i = 0; i < 3; i++) {
+                for (int c = 0; c < 4; c++)
+                    checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+            }
+        }
+
+        awaitPartitionMapExchange();
+
+        checkCaches(3, withNewCache ? 4 : 2);
+    }
+
+    /**
+     * @param srvs Number of servers.
+     * @param clients Number of clients.
+     * @return Activation future.
+     * @throws Exception If failed.
+     */
+    private IgniteInternalFuture<?> startNodesAndBlockActivation(int srvs, int clients) throws Exception {
         active = false;
         testSpi = true;
 
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < srvs + clients; i++) {
+            client = i >= srvs;
+
             ccfgs = cacheConfigurations1();
 
             startGrid(i);
@@ -237,12 +319,14 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
 
         TestRecordingCommunicationSpi spi1 = TestRecordingCommunicationSpi.spi(ignite(1));
 
+        final AffinityTopologyVersion ACTIVATE_TOP_VER = new AffinityTopologyVersion(srvs + clients, 1);
+
         spi1.blockMessages(new IgniteBiPredicate<ClusterNode, Message>() {
             @Override public boolean apply(ClusterNode clusterNode, Message msg) {
                 if (msg instanceof GridDhtPartitionsSingleMessage) {
                     GridDhtPartitionsSingleMessage pMsg = (GridDhtPartitionsSingleMessage)msg;
 
-                    if (pMsg.exchangeId() != null && pMsg.exchangeId().topologyVersion().topologyVersion() == 2)
+                    if (pMsg.exchangeId() != null && pMsg.exchangeId().topologyVersion().equals(ACTIVATE_TOP_VER))
                         return true;
                 }
 
@@ -262,28 +346,13 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
 
         assertFalse(activeFut.isDone());
 
-        IgniteInternalFuture<?> startFut = GridTestUtils.runAsync(new Callable<Void>() {
-            @Override public Void call() throws Exception {
-                ccfgs = cacheConfigurations1();
-
-                startGrid(2);
-
-                return null;
-            }
-        });
-
-        spi1.stopBlock();
-
-        activeFut.get();
-        startFut.get();
-
-        checkCaches(3, 2);
+        return activeFut;
     }
 
     /**
      * @throws Exception If failed.
      */
-    public void testJoinAndActivate() throws Exception {
+    public void testConcurrentJoinAndActivate() throws Exception {
         for (int iter = 0; iter < 3; iter++) {
             log.info("Iteration: " + iter);
 
@@ -335,6 +404,48 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     }
 
     /**
+     * @throws Exception If failed.
+     */
+    public void testDeactivateSimpleSingleNode() throws Exception {
+        deactivateSimple(1, 0, 0);
+    }
+
+    /**
+     * @param srvs Number of servers.
+     * @param clients Number of clients.
+     * @param deactivateFrom Index of node stating deactivation.
+     * @throws Exception If failed.
+     */
+    private void deactivateSimple(int srvs, int clients, int deactivateFrom) throws Exception {
+        active = true;
+
+        final int CACHES = 2;
+
+        for (int i = 0; i < srvs + clients; i++) {
+            client = i >= srvs;
+
+            ccfgs = cacheConfigurations1();
+
+            startGrid(i);
+        }
+
+        if (persistenceEnabled())
+            ignite(deactivateFrom).active(true);
+
+        ignite(deactivateFrom).active(true); // Should be no-op.
+
+        checkCaches(srvs + clients, CACHES);
+
+        for (int i = 0; i < srvs + clients; i++)
+            assertTrue(ignite(i).active());
+
+        ignite(deactivateFrom).active(false);
+
+        for (int i = 0; i < srvs + clients; i++)
+            assertFalse(ignite(i).active());
+    }
+
+    /**
      * @return Cache configurations.
      */
     private CacheConfiguration[] cacheConfigurations1() {
@@ -342,6 +453,20 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
 
         ccfgs[0] = cacheConfigurations(CACHE_NAME_PREFIX + 0, ATOMIC);
         ccfgs[1] = cacheConfigurations(CACHE_NAME_PREFIX + 1, TRANSACTIONAL);
+
+        return ccfgs;
+    }
+
+    /**
+     * @return Cache configurations.
+     */
+    private CacheConfiguration[] cacheConfigurations2() {
+        CacheConfiguration[] ccfgs = new CacheConfiguration[4];
+
+        ccfgs[0] = cacheConfigurations(CACHE_NAME_PREFIX + 0, ATOMIC);
+        ccfgs[1] = cacheConfigurations(CACHE_NAME_PREFIX + 1, TRANSACTIONAL);
+        ccfgs[2] = cacheConfigurations(CACHE_NAME_PREFIX + 2, ATOMIC);
+        ccfgs[3] = cacheConfigurations(CACHE_NAME_PREFIX + 3, TRANSACTIONAL);
 
         return ccfgs;
     }
@@ -359,5 +484,31 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
         ccfg.setBackups(1);
 
         return ccfg;
+    }
+
+    /**
+     * @param cacheName Cache name.
+     * @param node Node.
+     * @param exp {@code True} if expect that cache is started on node.
+     */
+    private void checkCache(Ignite node, String cacheName, boolean exp) {
+        GridCacheAdapter cache = ((IgniteKernal)node).context().cache().internalCache(cacheName);
+
+        if (exp)
+            assertNotNull(cache);
+        else
+            assertNull(cache);
+    }
+
+    /**
+     * @param nodes Number of nodes.
+     */
+    private void checkNoCaches(int nodes) {
+        for (int i = 0; i < nodes; i++) {
+            GridCacheProcessor cache = ((IgniteKernal)ignite(i)).context().cache();
+
+            assertTrue(cache.caches().isEmpty());
+            assertTrue(cache.internalCaches().isEmpty());
+        }
     }
 }

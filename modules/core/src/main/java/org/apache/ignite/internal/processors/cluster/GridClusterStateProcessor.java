@@ -165,8 +165,11 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
         if (joinFut != null)
             joinFut.onDone(msg.clusterActive());
 
-        if (msg.requestId().equals(globalState.transitionRequestId()))
+        if (msg.requestId().equals(globalState.transitionRequestId())) {
             globalState = DiscoveryDataClusterState.createState(msg.clusterActive());
+
+            ctx.cache().onStateChangeFinish(msg);
+        }
     }
 
     /**
@@ -409,8 +412,6 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
                 cacheProc.stopCaches(true);
 
                 sharedCtx.affinity().removeAllCacheInfo();
-
-                ctx.discovery().cleanCachesAndGroups();
 
                 if (!ctx.clientNode()) {
                     sharedCtx.database().onDeActivate(ctx);
@@ -849,6 +850,7 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
 
         /**
          * @param state Current state.
+         * @param discoCache Discovery data cache.
          */
         TransitionOnJoinWaitFuture(DiscoveryDataClusterState state, DiscoCache discoCache) {
             assert state.transition() : state;
@@ -859,6 +861,17 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
                 if (discoCache.node(nodeId) != null)
                     transitionNodes.add(nodeId);
             }
+        }
+
+        /** {@inheritDoc} */
+        @Override public boolean onDone(@Nullable Boolean res, @Nullable Throwable err) {
+            if (super.onDone(res, err)) {
+                joinFut = null;
+
+                return true;
+            }
+
+            return false;
         }
     }
 }

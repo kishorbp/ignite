@@ -40,7 +40,7 @@ import org.apache.ignite.configuration.NearCacheConfiguration;
 import org.apache.ignite.internal.GridKernalContext;
 import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
-import org.apache.ignite.internal.processors.cluster.DiscoveryDataClusterState;
+import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateFinishMessage;
 import org.apache.ignite.internal.processors.query.QuerySchema;
 import org.apache.ignite.internal.processors.query.QueryUtils;
 import org.apache.ignite.internal.processors.query.schema.SchemaOperationException;
@@ -97,6 +97,9 @@ class ClusterCachesInfo {
 
     /** */
     private Map<UUID, CacheClientReconnectDiscoveryData> clientReconnectReqs;
+
+    /** */
+    private boolean joinOnTransition;
 
     /**
      * @param ctx Context.
@@ -951,11 +954,17 @@ class ClusterCachesInfo {
     private void initStartCachesForLocalJoin(boolean firstNode) {
         assert locJoinStartCaches == null;
 
-        locJoinStartCaches = new ArrayList<>();
-        locCfgsForActivation = new HashMap<>();
-
         if (joinDiscoData != null) {
-           boolean active = ctx.state().clusterState().active() && !ctx.state().clusterState().transition();
+            if (ctx.state().clusterState().transition()) {
+                joinOnTransition = true;
+
+                return;
+            }
+
+            locJoinStartCaches = new ArrayList<>();
+            locCfgsForActivation = new HashMap<>();
+
+            boolean active = ctx.state().clusterState().active() && !ctx.state().clusterState().transition();
 
             for (DynamicCacheDescriptor desc : registeredCaches.values()) {
                 if (firstNode && !joinDiscoData.caches().containsKey(desc.cacheName()))
@@ -1006,6 +1015,17 @@ class ClusterCachesInfo {
     }
 
     /**
+     *
+     */
+    void onStateChangeFinish(ChangeGlobalStateFinishMessage msg) {
+        if (joinOnTransition) {
+            initStartCachesForLocalJoin(false);
+
+            joinOnTransition = false;
+        }
+    }
+
+    /**
      * @param exchangeActions Exchange actions to modify.
      */
     void onStateChangeRequest(ExchangeActions exchangeActions) {
@@ -1040,7 +1060,15 @@ class ClusterCachesInfo {
                 exchangeActions.addCacheGroupToStart(grpDesc);
         }
         else {
-            // TODO GG-12389.
+            for (DynamicCacheDescriptor desc : registeredCaches.values()) {
+                DynamicCacheChangeRequest req =
+                    DynamicCacheChangeRequest.stopRequest(ctx, desc.cacheName(), desc.sql(), false);
+
+                exchangeActions.addCacheToStop(req, desc);
+            }
+
+            for (CacheGroupDescriptor grpDesc : registeredCacheGroups().values())
+                exchangeActions.addCacheGroupToStop(grpDesc);
         }
     }
 
