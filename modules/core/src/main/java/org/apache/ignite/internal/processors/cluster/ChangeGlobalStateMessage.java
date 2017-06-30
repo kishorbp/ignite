@@ -17,9 +17,11 @@
 
 package org.apache.ignite.internal.processors.cluster;
 
+import java.util.List;
 import java.util.UUID;
 import org.apache.ignite.internal.managers.discovery.DiscoveryCustomMessage;
 import org.apache.ignite.internal.processors.cache.ExchangeActions;
+import org.apache.ignite.internal.processors.cache.StoredCacheData;
 import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.lang.IgniteUuid;
 import org.jetbrains.annotations.Nullable;
@@ -44,6 +46,9 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     private boolean activate;
 
     /** */
+    private List<StoredCacheData> storedCfgs;
+
+    /** */
     private transient ExchangeActions exchangeActions;
 
     /**
@@ -52,11 +57,20 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     public ChangeGlobalStateMessage(
         UUID requestId,
         UUID initiatingNodeId,
+        List<StoredCacheData> storedCfgs,
         boolean activate
     ) {
         this.requestId = requestId;
         this.initiatingNodeId = initiatingNodeId;
+        this.storedCfgs = storedCfgs;
         this.activate = activate;
+    }
+
+    /**
+     * @return Stored cache configurations.
+     */
+    @Nullable public List<StoredCacheData> storedCacheConfigurations() {
+        return storedCfgs;
     }
 
     /**

@@ -17,6 +17,8 @@
 
 package org.apache.ignite.internal.processors.cache;
 
+import java.util.Arrays;
+import org.apache.ignite.Ignite;
 import org.apache.ignite.testframework.GridTestUtils;
 
 /**
@@ -40,5 +42,46 @@ public class IgniteClusterActivateDeactivateTestWithPersistence extends IgniteCl
         super.afterTest();
 
         GridTestUtils.deleteDbFiles();
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testActivateCachesRestore_SingleNode() throws Exception {
+        activateCachesRestore(1);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testActivateCachesRestore_5_Servers() throws Exception {
+        activateCachesRestore(5);
+    }
+
+    /**
+     * @param srvs Number of server nodes.
+     * @throws Exception If failed.
+     */
+    private void activateCachesRestore(int srvs) throws Exception {
+        Ignite srv = startGrids(srvs);
+
+        srv.active(true);
+
+        srv.createCaches(Arrays.asList(cacheConfigurations1()));
+
+        stopAllGrids();
+
+        srv = startGrids(srvs);
+
+        checkNoCaches(srvs);
+
+        srv.active(true);
+
+        for (int i = 0; i < srvs; i++) {
+            for (int c = 0; c < 2; c++)
+                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+        }
+
+        checkCaches(srvs, 2);
     }
 }

@@ -570,6 +570,13 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
     }
 
     /**
+     * @throws IgniteCheckedException If failed.
+     */
+    public void readCheckpointAndRestoreMemory() throws IgniteCheckedException {
+        // No-op.
+    }
+
+    /**
      * @param memPlcName Name of {@link MemoryPolicy} to obtain {@link MemoryMetrics} for.
      * @return {@link MemoryMetrics} snapshot for specified {@link MemoryPolicy} or {@code null} if
      * no {@link MemoryPolicy} is configured for specified name.

@@ -89,7 +89,7 @@ public class ExchangeActions {
     /**
      * @return New caches start requests.
      */
-    Collection<ActionData> cacheStartRequests() {
+    public Collection<ActionData> cacheStartRequests() {
         return cachesToStart != null ? cachesToStart.values() : Collections.<ActionData>emptyList();
     }
 
@@ -347,7 +347,7 @@ public class ExchangeActions {
     /**
      *
      */
-    static class ActionData {
+    public static class ActionData {
         /** */
         private final DynamicCacheChangeRequest req;
 

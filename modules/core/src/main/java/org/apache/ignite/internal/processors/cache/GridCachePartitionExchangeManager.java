@@ -291,35 +291,37 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
 
                     return;
                 }
+                if (evt.type() == EVT_DISCOVERY_CUSTOM_EVT &&
+                    (((DiscoveryCustomEvent)evt).customMessage() instanceof ChangeGlobalStateFinishMessage)) {
+                    ChangeGlobalStateFinishMessage stateFinishMsg =
+                        (ChangeGlobalStateFinishMessage)((DiscoveryCustomEvent)evt).customMessage();
 
-                // TODO GG-12389.
-                if (cache == null)
-                    cache = cctx.discovery().discoCache();
+                    if (stateFinishMsg.clusterActive()) {
+                        for (PendingDiscoveryEvent pendingEvt : pendingEvts) {
+                            log.info("Process pending event: " + pendingEvt.event());
 
-                if (cache.state().transition()) {
-                    if (evt.type() == EVT_DISCOVERY_CUSTOM_EVT &&
-                        (((DiscoveryCustomEvent)evt).customMessage() instanceof ChangeGlobalStateFinishMessage)) {
-                        ChangeGlobalStateFinishMessage stateFinishMsg =
-                            (ChangeGlobalStateFinishMessage)((DiscoveryCustomEvent)evt).customMessage();
-
-                        if (stateFinishMsg.clusterActive()) {
-                            for (PendingDiscoveryEvent pendingEvt : pendingEvts)
-                                onDiscoveryEvent(pendingEvt.event(), pendingEvt.discoCache());
+                            onDiscoveryEvent(pendingEvt.event(), pendingEvt.discoCache());
                         }
-
-                        pendingEvts.clear();
                     }
                     else {
-                        if (evt.type() != EVT_DISCOVERY_CUSTOM_EVT)
-                            pendingEvts.add(new PendingDiscoveryEvent(evt, cache));
-                        else {
-                            U.warn(log, "Received custom discovery event while cluster state transition " +
-                                "is in progress: " + evt);
-                        }
+                        for (PendingDiscoveryEvent pendingEvt : pendingEvts)
+                            processEventInactive(pendingEvt.event(), pendingEvt.discoCache());
                     }
+
+                    pendingEvts.clear();
+
+                    return;
+                }
+
+                if (cache.state().transition()) {
+                    log.info("Add pending event: " + evt);
+
+                    pendingEvts.add(new PendingDiscoveryEvent(evt, cache));
                 }
                 else if (cache.state().active())
                     onDiscoveryEvent(evt, cache);
+                else
+                    processEventInactive(evt, cache);
 
                 if (evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED) {
                     final ClusterNode n = evt.eventNode();
@@ -338,6 +340,12 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
             }
         }
     };
+
+    private void processEventInactive(DiscoveryEvent evt, DiscoCache cache) {
+        log.info("Ignore event: " + evt);
+
+        // TODO GG-12389: finish operations with error.
+   }
 
     /**
      * @param evt Event.

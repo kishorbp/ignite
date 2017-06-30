@@ -56,7 +56,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     private static final TcpDiscoveryIpFinder IP_FINDER = new TcpDiscoveryVmIpFinder(true);
 
     /** */
-    private static final String CACHE_NAME_PREFIX = "cache-";
+    protected static final String CACHE_NAME_PREFIX = "cache-";
 
     /** */
     private boolean client;
@@ -125,7 +125,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     /**
      * @throws Exception If failed.
      */
-    public void testActivateSimpleSingleNode() throws Exception {
+    public void testActivateSimple_SingleNode() throws Exception {
         activateSimple(1, 0, 0);
     }
 
@@ -218,7 +218,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
      * @param nodes Number of nodes.
      * @param caches Number of caches.
      */
-    private void checkCaches(int nodes, int caches) {
+    final void checkCaches(int nodes, int caches) {
         for (int i  = 0; i < nodes; i++) {
             for (int c = 0; c < caches; c++) {
                 IgniteCache<Integer, Integer> cache = ignite(i).cache(CACHE_NAME_PREFIX + c);
@@ -406,7 +406,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     /**
      * @throws Exception If failed.
      */
-    public void testDeactivateSimpleSingleNode() throws Exception {
+    public void testDeactivateSimple_SingleNode() throws Exception {
         deactivateSimple(1, 0, 0);
     }
 
@@ -471,16 +471,45 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
 
         for (int i = 0; i < srvs + clients; i++)
             assertFalse(ignite(i).active());
+
+        checkNoCaches(srvs + clients);
+
+        client = false;
+
+        startGrid(srvs + clients);
+
+        checkNoCaches(srvs + clients + 1);
+
+        client = true;
+
+        startGrid(srvs + clients + 1);
+
+        checkNoCaches(srvs + clients + 2);
+
+        for (int i = 0; i < srvs + clients + 2; i++)
+            assertFalse(ignite(i).active());
+
+        ignite(deactivateFrom).active(true);
+
+        for (int i = 0; i < srvs + clients + 2; i++)
+            assertTrue(ignite(i).active());
+
+        for (int i = 0; i < srvs; i++) {
+            for (int c = 0; c < 2; c++)
+                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+        }
+
+        checkCaches(srvs + clients + 2, CACHES);
     }
 
     /**
      * @return Cache configurations.
      */
-    private CacheConfiguration[] cacheConfigurations1() {
+    final CacheConfiguration[] cacheConfigurations1() {
         CacheConfiguration[] ccfgs = new CacheConfiguration[2];
 
-        ccfgs[0] = cacheConfigurations(CACHE_NAME_PREFIX + 0, ATOMIC);
-        ccfgs[1] = cacheConfigurations(CACHE_NAME_PREFIX + 1, TRANSACTIONAL);
+        ccfgs[0] = cacheConfiguration(CACHE_NAME_PREFIX + 0, ATOMIC);
+        ccfgs[1] = cacheConfiguration(CACHE_NAME_PREFIX + 1, TRANSACTIONAL);
 
         return ccfgs;
     }
@@ -488,13 +517,13 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     /**
      * @return Cache configurations.
      */
-    private CacheConfiguration[] cacheConfigurations2() {
+    final CacheConfiguration[] cacheConfigurations2() {
         CacheConfiguration[] ccfgs = new CacheConfiguration[4];
 
-        ccfgs[0] = cacheConfigurations(CACHE_NAME_PREFIX + 0, ATOMIC);
-        ccfgs[1] = cacheConfigurations(CACHE_NAME_PREFIX + 1, TRANSACTIONAL);
-        ccfgs[2] = cacheConfigurations(CACHE_NAME_PREFIX + 2, ATOMIC);
-        ccfgs[3] = cacheConfigurations(CACHE_NAME_PREFIX + 3, TRANSACTIONAL);
+        ccfgs[0] = cacheConfiguration(CACHE_NAME_PREFIX + 0, ATOMIC);
+        ccfgs[1] = cacheConfiguration(CACHE_NAME_PREFIX + 1, TRANSACTIONAL);
+        ccfgs[2] = cacheConfiguration(CACHE_NAME_PREFIX + 2, ATOMIC);
+        ccfgs[3] = cacheConfiguration(CACHE_NAME_PREFIX + 3, TRANSACTIONAL);
 
         return ccfgs;
     }
@@ -504,7 +533,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
      * @param atomicityMode Atomicity mode.
      * @return Cache configuration.
      */
-    private CacheConfiguration cacheConfigurations(String name, CacheAtomicityMode atomicityMode) {
+    protected final CacheConfiguration cacheConfiguration(String name, CacheAtomicityMode atomicityMode) {
         CacheConfiguration ccfg = new CacheConfiguration(name);
 
         ccfg.setWriteSynchronizationMode(FULL_SYNC);
@@ -519,7 +548,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
      * @param node Node.
      * @param exp {@code True} if expect that cache is started on node.
      */
-    private void checkCache(Ignite node, String cacheName, boolean exp) {
+    void checkCache(Ignite node, String cacheName, boolean exp) {
         GridCacheAdapter cache = ((IgniteKernal)node).context().cache().internalCache(cacheName);
 
         if (exp)
@@ -531,7 +560,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     /**
      * @param nodes Number of nodes.
      */
-    private void checkNoCaches(int nodes) {
+    final void checkNoCaches(int nodes) {
         for (int i = 0; i < nodes; i++) {
             GridCacheProcessor cache = ((IgniteKernal)ignite(i)).context().cache();
 

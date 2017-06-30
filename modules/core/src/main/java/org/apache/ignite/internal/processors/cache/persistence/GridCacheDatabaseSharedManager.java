@@ -102,6 +102,7 @@ import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cache.CacheGroupContext;
 import org.apache.ignite.internal.processors.cache.ClusterState;
 import org.apache.ignite.internal.processors.cache.DynamicCacheDescriptor;
+import org.apache.ignite.internal.processors.cache.ExchangeActions;
 import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.cache.GridCacheSharedContext;
 import org.apache.ignite.internal.processors.cache.StoredCacheData;
@@ -437,47 +438,6 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
         // No-op.
     }
 
-    /**
-     *
-     */
-    private void initCachesAndRestoreMemory() throws IgniteCheckedException {
-        Collection<String> cacheNames = new HashSet<>();
-
-        // TODO IGNITE-5075 group descriptors.
-        for (CacheConfiguration ccfg : cctx.kernalContext().config().getCacheConfiguration()) {
-            if (CU.isSystemCache(ccfg.getName())) {
-                storeMgr.initializeForCache(
-                    cctx.cache().cacheDescriptors().get(ccfg.getName()).groupDescriptor(),
-                    new StoredCacheData(ccfg)
-                );
-
-                cacheNames.add(ccfg.getName());
-            }
-        }
-
-        for (CacheConfiguration ccfg : cctx.kernalContext().config().getCacheConfiguration())
-            if (!CU.isSystemCache(ccfg.getName())) {
-                DynamicCacheDescriptor cacheDesc = cctx.cache().cacheDescriptors().get(ccfg.getName());
-
-                if (cacheDesc != null)
-                    storeMgr.initializeForCache(
-                        cacheDesc.groupDescriptor(),
-                        new StoredCacheData(ccfg)
-                    );
-
-                cacheNames.add(ccfg.getName());
-            }
-
-        for (StoredCacheData cacheData : cctx.pageStore().readCacheConfigurations().values()) {
-            if (!cacheNames.contains(cacheData.config().getName()))
-                storeMgr.initializeForCache(
-                    cctx.cache().cacheDescriptors().get(
-                        cacheData.config().getName()).groupDescriptor(), cacheData);
-        }
-
-        readCheckpointAndRestoreMemory();
-    }
-
     /** {@inheritDoc} */
     @Override public void onActivate(GridKernalContext ctx) throws IgniteCheckedException {
         super.onActivate(ctx);
@@ -492,12 +452,7 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
             initDataBase();
 
             registrateMetricsMBean();
-
-            initCachesAndRestoreMemory();
         }
-
-        if (log.isDebugEnabled())
-            log.debug("Restore state after activation [nodeId=" + cctx.localNodeId() + " ]");
     }
 
     /** {@inheritDoc} */
@@ -552,10 +507,8 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
         }
     }
 
-    /**
-     *
-     */
-    private void readCheckpointAndRestoreMemory() throws IgniteCheckedException {
+    /** {@inheritDoc} */
+    @Override public void readCheckpointAndRestoreMemory() throws IgniteCheckedException {
         checkpointReadLock();
 
         try {
@@ -1560,7 +1513,7 @@ public class GridCacheDatabaseSharedManager extends IgniteCacheDatabaseSharedMan
         Map<T2<Integer, Integer>, T2<Integer, Long>> partStates
     ) throws IgniteCheckedException {
         for (CacheGroupContext grp : cctx.cache().cacheGroups()) {
-            if (grp.isLocal())
+            if (grp.isLocal() || !grp.affinityNode())
                 // Local cache has no partitions and its states.
                 continue;
 

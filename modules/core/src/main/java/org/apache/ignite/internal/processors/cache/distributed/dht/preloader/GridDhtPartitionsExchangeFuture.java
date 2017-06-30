@@ -571,7 +571,6 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                     assert exchActions != null && !exchActions.empty();
 
                     exchange = onClusterStateChangeRequest(crdNode);
-
                 }
                 else if (msg instanceof DynamicCacheChangeBatch) {
                     assert exchActions != null && !exchActions.empty();
@@ -602,6 +601,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                         cctx.activate();
 
                         cctx.cache().startCachesOnLocalJoin(topVer);
+
+                        cctx.database().readCheckpointAndRestoreMemory();
                     }
                 }
 
@@ -747,6 +748,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                 cctx.activate();
 
                 cctx.affinity().onCacheChangeRequest(this, crd, exchActions);
+
+                cctx.database().readCheckpointAndRestoreMemory();
 
                 if (log.isInfoEnabled()) {
                     log.info("Successfully activated caches [nodeId=" + cctx.localNodeId() +

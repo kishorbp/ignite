@@ -617,6 +617,10 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                     else if (customMsg instanceof ChangeGlobalStateFinishMessage) {
                         ctx.state().onStateFinishMessage((ChangeGlobalStateFinishMessage)customMsg);
 
+                        discoCache = createDiscoCache(ctx.state().clusterState(), locNode, topSnapshot);
+
+                        topSnap.set(new Snapshot(topSnap.get().topVer, discoCache));
+
                         incMinorTopVer = false;
                     }
                     else {
@@ -2374,6 +2378,9 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
 
     /** Worker for discovery events. */
     private class DiscoveryWorker extends GridWorker {
+        /** */
+        private DiscoCache discoCache;
+
         /** Event queue. */
         private final BlockingQueue<GridTuple6<Integer, AffinityTopologyVersion, ClusterNode,
             DiscoCache, Collection<ClusterNode>, DiscoveryCustomMessage>> evts = new LinkedBlockingQueue<>();
@@ -2491,6 +2498,9 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
             boolean isDaemon = node.isDaemon();
 
             boolean segmented = false;
+
+            if (evt.get4() != null)
+                discoCache = evt.get4();
 
             switch (type) {
                 case EVT_NODE_JOINED: {
@@ -2615,6 +2625,12 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                         customEvt.topologySnapshot(topVer.topologyVersion(), evt.get5());
                         customEvt.affinityTopologyVersion(topVer);
                         customEvt.customMessage(evt.get6());
+
+                        if (evt.get4() == null) {
+                            assert discoCache != null;
+
+                            evt.set4(discoCache);
+                        }
 
                         ctx.event().record(customEvt, evt.get4());
                     }

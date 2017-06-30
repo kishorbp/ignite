@@ -172,8 +172,7 @@ public class NoOpPageStoreManager implements IgnitePageStoreManager {
     }
 
     /** {@inheritDoc} */
-    @Override public void storeCacheData(CacheGroupDescriptor grpDesc,
-        StoredCacheData cacheData) throws IgniteCheckedException {
+    @Override public void storeCacheData(StoredCacheData cacheData) throws IgniteCheckedException {
         // No-op.
     }
 
@@ -184,11 +183,11 @@ public class NoOpPageStoreManager implements IgnitePageStoreManager {
 
     /** {@inheritDoc} */
     @Override public void onActivate(GridKernalContext kctx) {
-
+        // No-op.
     }
 
     /** {@inheritDoc} */
     @Override public void onDeActivate(GridKernalContext kctx) {
-
+        // No-op.
     }
 }

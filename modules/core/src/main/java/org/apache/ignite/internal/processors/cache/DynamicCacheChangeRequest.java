@@ -97,7 +97,6 @@ public class DynamicCacheChangeRequest implements Serializable {
     public DynamicCacheChangeRequest(UUID reqId, String cacheName, UUID initiatingNodeId) {
         assert reqId != null;
         assert cacheName != null;
-        assert initiatingNodeId != null;
 
         this.reqId = reqId;
         this.cacheName = cacheName;

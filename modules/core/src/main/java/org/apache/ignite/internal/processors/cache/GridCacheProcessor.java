@@ -108,6 +108,7 @@ import org.apache.ignite.internal.processors.cache.transactions.IgniteTxManager;
 import org.apache.ignite.internal.processors.cache.version.GridCacheVersionManager;
 import org.apache.ignite.internal.processors.cacheobject.IgniteCacheObjectProcessor;
 import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateFinishMessage;
+import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateMessage;
 import org.apache.ignite.internal.processors.cluster.DiscoveryDataClusterState;
 import org.apache.ignite.internal.processors.datastructures.DataStructuresProcessor;
 import org.apache.ignite.internal.processors.plugin.CachePluginManager;
@@ -2294,10 +2295,10 @@ public class GridCacheProcessor extends GridProcessorAdapter {
     }
 
     /**
-     * @param exchangeActions Exchange actions to modify.
+     * @param msg Message.
      */
-    public void onStateChangeRequest(ExchangeActions exchangeActions) {
-        cachesInfo.onStateChangeRequest(exchangeActions);
+    public ExchangeActions onStateChangeRequest(ChangeGlobalStateMessage msg, AffinityTopologyVersion topVer) {
+        return cachesInfo.onStateChangeRequest(msg, topVer);
     }
 
     /**
@@ -3177,7 +3178,7 @@ public class GridCacheProcessor extends GridProcessorAdapter {
                     proxy = new IgniteCacheProxy(cacheAdapter.context(), cacheAdapter, null, false);
             }
 
-            assert proxy != null;
+            assert proxy != null : name;
 
             return proxy.internalProxy();
         }
