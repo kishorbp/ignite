@@ -540,6 +540,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
         if (isDone())
             return;
 
+        assert !cctx.kernalContext().isDaemon();
+
         initTs = U.currentTimeMillis();
 
         U.await(evtLatch);
@@ -1830,6 +1832,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                     if (!F.isEmpty(changeGlobalStateExceptions))
                         cctx.kernalContext().state().onStateChangeError(changeGlobalStateExceptions, req);
 
+                    // TODO GG-12389 (case when sent full message but failed before custom message sent)
                     ChangeGlobalStateFinishMessage msg = new ChangeGlobalStateFinishMessage(req.requestId(),
                         req.activate());
 

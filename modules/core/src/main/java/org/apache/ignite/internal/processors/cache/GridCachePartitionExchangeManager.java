@@ -83,6 +83,7 @@ import org.apache.ignite.internal.processors.cache.distributed.dht.preloader.Ign
 import org.apache.ignite.internal.processors.cache.transactions.IgniteInternalTx;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteTxManager;
 import org.apache.ignite.internal.processors.cache.version.GridCacheVersion;
+import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateFinishMessage;
 import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateMessage;
 import org.apache.ignite.internal.processors.query.schema.SchemaNodeLeaveExchangeWorkerTask;
 import org.apache.ignite.internal.processors.timeout.GridTimeoutObject;
@@ -194,134 +195,6 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
     /** */
     private DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
 
-    /** Discovery listener. */
-    private final DiscoveryEventListener discoLsnr = new DiscoveryEventListener() {
-        @Override public void onEvent(DiscoveryEvent evt, DiscoCache cache) {
-            if (!enterBusy())
-                return;
-
-            try {
-                ClusterNode loc = cctx.localNode();
-
-                assert evt.type() == EVT_NODE_JOINED || evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED ||
-                    evt.type() == EVT_DISCOVERY_CUSTOM_EVT;
-
-                final ClusterNode n = evt.eventNode();
-
-                GridDhtPartitionExchangeId exchId = null;
-                GridDhtPartitionsExchangeFuture exchFut = null;
-
-                if (evt.type() != EVT_DISCOVERY_CUSTOM_EVT) {
-                    assert !loc.id().equals(n.id());
-
-                    assert evt.type() != EVT_NODE_JOINED || n.order() > loc.order() :
-                        "Node joined with smaller-than-local " +
-                        "order [newOrder=" + n.order() + ", locOrder=" + loc.order() + ']';
-
-                    // TODO GG-12389 process transition.
-                    if (cache.state().active()) {
-                        exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
-
-                        exchFut = exchangeFuture(exchId, evt, cache,null, null);
-                    }
-                }
-                else {
-                    DiscoveryCustomMessage customMsg = ((DiscoveryCustomEvent)evt).customMessage();
-
-                    if (customMsg instanceof ChangeGlobalStateMessage) {
-                        ChangeGlobalStateMessage stateChangeMsg = (ChangeGlobalStateMessage)customMsg;
-
-                        ExchangeActions exchActions = stateChangeMsg.exchangeActions();
-
-                        if (exchActions != null) {
-                            exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
-
-                            exchFut = exchangeFuture(exchId, evt, cache, exchActions, null);
-                        }
-                    }
-                    else if (customMsg instanceof DynamicCacheChangeBatch) {
-                        DynamicCacheChangeBatch batch = (DynamicCacheChangeBatch)customMsg;
-
-                        ExchangeActions exchActions = batch.exchangeActions();
-
-                        if (exchActions != null) {
-                            exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
-
-                            exchFut = exchangeFuture(exchId, evt, cache, exchActions, null);
-                        }
-                    }
-                    else if (customMsg instanceof CacheAffinityChangeMessage) {
-                        CacheAffinityChangeMessage msg = (CacheAffinityChangeMessage)customMsg;
-
-                        if (msg.exchangeId() == null) {
-                            if (msg.exchangeNeeded()) {
-                                exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
-
-                                exchFut = exchangeFuture(exchId, evt, cache, null, msg);
-                            }
-                        }
-                        else
-                            exchangeFuture(msg.exchangeId(), null, null, null, null)
-                                .onAffinityChangeMessage(evt.eventNode(), msg);
-                    }
-                    else if (customMsg instanceof StartSnapshotOperationAckDiscoveryMessage
-                        && ((StartSnapshotOperationAckDiscoveryMessage)customMsg).needExchange()) {
-                        exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
-
-                        exchFut = exchangeFuture(exchId, evt, null, null, null);
-                    }
-                    else {
-                        // Process event as custom discovery task if needed.
-                        CachePartitionExchangeWorkerTask task =
-                            cctx.cache().exchangeTaskForCustomDiscoveryMessage(customMsg);
-
-                        if (task != null)
-                            exchWorker.addCustomTask(task);
-                    }
-                }
-
-                if (exchId != null) {
-                    if (log.isDebugEnabled())
-                        log.debug("Discovery event (will start exchange): " + exchId);
-
-                    // Event callback - without this callback future will never complete.
-                    exchFut.onEvent(exchId, evt, cache);
-
-                    // Start exchange process.
-                    addFuture(exchFut);
-                }
-                else {
-                    if (log.isDebugEnabled())
-                        log.debug("Do not start exchange for discovery event: " + evt);
-                }
-
-                if (evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED) {
-                    assert cctx.discovery().node(n.id()) == null;
-
-                    // Avoid race b/w initial future add and discovery event.
-                    GridDhtPartitionsExchangeFuture initFut = null;
-
-                    if (readyTopVer.get().equals(AffinityTopologyVersion.NONE)) {
-                        initFut = exchangeFuture(initialExchangeId(), null, null, null, null);
-
-                        initFut.onNodeLeft(n);
-                    }
-
-                    for (GridDhtPartitionsExchangeFuture f : exchFuts.values()) {
-                        if (f != initFut)
-                            f.onNodeLeft(n);
-                    }
-
-                    // Notify indexing engine about node leave so that we can re-map coordinator accordingly.
-                    exchWorker.addCustomTask(new SchemaNodeLeaveExchangeWorkerTask(evt.eventNode()));
-                }
-            }
-            finally {
-                leaveBusy();
-            }
-        }
-    };
-
     /** {@inheritDoc} */
     @Override protected void start0() throws IgniteCheckedException {
         super.start0();
@@ -351,6 +224,225 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
                     processSinglePartitionRequest(node, msg);
                 }
             });
+
+        if (!cctx.kernalContext().clientNode()) {
+            for (int cnt = 0; cnt < cctx.gridConfig().getRebalanceThreadPoolSize(); cnt++) {
+                final int idx = cnt;
+
+                cctx.io().addOrderedCacheGroupHandler(cctx, rebalanceTopic(cnt), new CI2<UUID, GridCacheGroupIdMessage>() {
+                    @Override public void apply(final UUID id, final GridCacheGroupIdMessage m) {
+                        if (!enterBusy())
+                            return;
+
+                        try {
+                            CacheGroupContext grp = cctx.cache().cacheGroup(m.groupId());
+
+                            if (grp != null) {
+                                if (m instanceof GridDhtPartitionSupplyMessage) {
+                                    grp.preloader().handleSupplyMessage(idx, id, (GridDhtPartitionSupplyMessage) m);
+
+                                    return;
+                                }
+                                else if (m instanceof GridDhtPartitionDemandMessage) {
+                                    grp.preloader().handleDemandMessage(idx, id, (GridDhtPartitionDemandMessage) m);
+
+                                    return;
+                                }
+                            }
+
+                            U.error(log, "Unsupported message type: " + m.getClass().getName());
+                        }
+                        finally {
+                            leaveBusy();
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    /** */
+    private final List<PendingDiscoveryEvent> pendingEvts = new ArrayList<>();
+
+    /**
+     * @param evt Event.
+     * @param cache Cache.
+     */
+    public void onLocalJoin(DiscoveryEvent evt, DiscoCache cache) {
+        discoLsnr.onEvent(evt, cache);
+    }
+
+    /** Discovery listener. */
+    private final DiscoveryEventListener discoLsnr = new DiscoveryEventListener() {
+        @Override public void onEvent(DiscoveryEvent evt, DiscoCache cache) {
+            if (!enterBusy())
+                return;
+
+            try {
+                if (evt.type() == EVT_DISCOVERY_CUSTOM_EVT &&
+                    (((DiscoveryCustomEvent)evt).customMessage() instanceof ChangeGlobalStateMessage)) {
+                    ChangeGlobalStateMessage stateChangeMsg =
+                        (ChangeGlobalStateMessage)((DiscoveryCustomEvent)evt).customMessage();
+
+                    if (stateChangeMsg.exchangeActions() == null)
+                        return;
+
+                    onDiscoveryEvent(evt, cache);
+
+                    return;
+                }
+
+                // TODO GG-12389.
+                if (cache == null)
+                    cache = cctx.discovery().discoCache();
+
+                if (cache.state().transition()) {
+                    if (evt.type() == EVT_DISCOVERY_CUSTOM_EVT &&
+                        (((DiscoveryCustomEvent)evt).customMessage() instanceof ChangeGlobalStateFinishMessage)) {
+                        ChangeGlobalStateFinishMessage stateFinishMsg =
+                            (ChangeGlobalStateFinishMessage)((DiscoveryCustomEvent)evt).customMessage();
+
+                        if (stateFinishMsg.clusterActive()) {
+                            for (PendingDiscoveryEvent pendingEvt : pendingEvts)
+                                onDiscoveryEvent(pendingEvt.event(), pendingEvt.discoCache());
+                        }
+
+                        pendingEvts.clear();
+                    }
+                    else {
+                        if (evt.type() != EVT_DISCOVERY_CUSTOM_EVT)
+                            pendingEvts.add(new PendingDiscoveryEvent(evt, cache));
+                        else {
+                            U.warn(log, "Received custom discovery event while cluster state transition " +
+                                "is in progress: " + evt);
+                        }
+                    }
+                }
+                else if (cache.state().active())
+                    onDiscoveryEvent(evt, cache);
+
+                if (evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED) {
+                    final ClusterNode n = evt.eventNode();
+
+                    assert cctx.discovery().node(n.id()) == null;
+
+                    // Avoid race b/w initial future add and discovery event.
+                    GridDhtPartitionsExchangeFuture initFut = null;
+
+                    if (readyTopVer.get().equals(AffinityTopologyVersion.NONE)) {
+                        initFut = exchangeFuture(initialExchangeId(), null, null, null, null);
+
+                        initFut.onNodeLeft(n);
+                    }
+
+                    for (GridDhtPartitionsExchangeFuture f : exchFuts.values()) {
+                        if (f != initFut)
+                            f.onNodeLeft(n);
+                    }
+
+                    // Notify indexing engine about node leave so that we can re-map coordinator accordingly.
+                    exchWorker.addCustomTask(new SchemaNodeLeaveExchangeWorkerTask(evt.eventNode()));
+                }
+            }
+            finally {
+                leaveBusy();
+            }
+        }
+    };
+
+    /**
+     * @param evt Event.
+     * @param cache Discovery data cache.
+     */
+    private void onDiscoveryEvent(DiscoveryEvent evt, DiscoCache cache) {
+        ClusterNode loc = cctx.localNode();
+
+        assert evt.type() == EVT_NODE_JOINED || evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED ||
+            evt.type() == EVT_DISCOVERY_CUSTOM_EVT;
+
+        final ClusterNode n = evt.eventNode();
+
+        GridDhtPartitionExchangeId exchId = null;
+        GridDhtPartitionsExchangeFuture exchFut = null;
+
+        if (evt.type() != EVT_DISCOVERY_CUSTOM_EVT) {
+            assert evt.type() != EVT_NODE_JOINED || n.isLocal() || n.order() > loc.order() :
+                "Node joined with smaller-than-local " +
+                    "order [newOrder=" + n.order() + ", locOrder=" + loc.order() + ']';
+
+            exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
+
+            exchFut = exchangeFuture(exchId, evt, cache,null, null);
+        }
+        else {
+            DiscoveryCustomMessage customMsg = ((DiscoveryCustomEvent)evt).customMessage();
+
+            if (customMsg instanceof ChangeGlobalStateMessage) {
+                ChangeGlobalStateMessage stateChangeMsg = (ChangeGlobalStateMessage)customMsg;
+
+                ExchangeActions exchActions = stateChangeMsg.exchangeActions();
+
+                if (exchActions != null) {
+                    exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
+
+                    exchFut = exchangeFuture(exchId, evt, cache, exchActions, null);
+                }
+            }
+            else if (customMsg instanceof DynamicCacheChangeBatch) {
+                DynamicCacheChangeBatch batch = (DynamicCacheChangeBatch)customMsg;
+
+                ExchangeActions exchActions = batch.exchangeActions();
+
+                if (exchActions != null) {
+                    exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
+
+                    exchFut = exchangeFuture(exchId, evt, cache, exchActions, null);
+                }
+            }
+            else if (customMsg instanceof CacheAffinityChangeMessage) {
+                CacheAffinityChangeMessage msg = (CacheAffinityChangeMessage)customMsg;
+
+                if (msg.exchangeId() == null) {
+                    if (msg.exchangeNeeded()) {
+                        exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
+
+                        exchFut = exchangeFuture(exchId, evt, cache, null, msg);
+                    }
+                }
+                else
+                    exchangeFuture(msg.exchangeId(), null, null, null, null)
+                        .onAffinityChangeMessage(evt.eventNode(), msg);
+            }
+            else if (customMsg instanceof StartSnapshotOperationAckDiscoveryMessage
+                && ((StartSnapshotOperationAckDiscoveryMessage)customMsg).needExchange()) {
+                exchId = exchangeId(n.id(), affinityTopologyVersion(evt), evt.type());
+
+                exchFut = exchangeFuture(exchId, evt, null, null, null);
+            }
+            else {
+                // Process event as custom discovery task if needed.
+                CachePartitionExchangeWorkerTask task =
+                    cctx.cache().exchangeTaskForCustomDiscoveryMessage(customMsg);
+
+                if (task != null)
+                    exchWorker.addCustomTask(task);
+            }
+        }
+
+        if (exchId != null) {
+            if (log.isDebugEnabled())
+                log.debug("Discovery event (will start exchange): " + exchId);
+
+            // Event callback - without this callback future will never complete.
+            exchFut.onEvent(exchId, evt, cache);
+
+            // Start exchange process.
+            addFuture(exchFut);
+        }
+        else {
+            if (log.isDebugEnabled())
+                log.debug("Do not start exchange for discovery event: " + evt);
+        }
     }
 
     /**
@@ -406,43 +498,6 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
 
             if (reconnect)
                 reconnectExchangeFut = new GridFutureAdapter<>();
-
-            exchWorker.addFirstExchangeFuture(fut);
-
-            if (!cctx.kernalContext().clientNode()) {
-                for (int cnt = 0; cnt < cctx.gridConfig().getRebalanceThreadPoolSize(); cnt++) {
-                    final int idx = cnt;
-
-                    cctx.io().addOrderedCacheGroupHandler(rebalanceTopic(cnt), new CI2<UUID, GridCacheGroupIdMessage>() {
-                        @Override public void apply(final UUID id, final GridCacheGroupIdMessage m) {
-                            if (!enterBusy())
-                                return;
-
-                            try {
-                                CacheGroupContext grp = cctx.cache().cacheGroup(m.groupId());
-
-                                if (grp != null) {
-                                    if (m instanceof GridDhtPartitionSupplyMessage) {
-                                        grp.preloader().handleSupplyMessage(idx, id, (GridDhtPartitionSupplyMessage) m);
-
-                                        return;
-                                    }
-                                    else if (m instanceof GridDhtPartitionDemandMessage) {
-                                        grp.preloader().handleDemandMessage(idx, id, (GridDhtPartitionDemandMessage) m);
-
-                                        return;
-                                    }
-                                }
-
-                                U.error(log, "Unsupported message type: " + m.getClass().getName());
-                            }
-                            finally {
-                                leaveBusy();
-                            }
-                        }
-                    });
-                }
-            }
         }
 
         new IgniteThread(cctx.igniteInstanceName(), "exchange-worker", exchWorker).start();
@@ -1721,15 +1776,6 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
          */
         private ExchangeWorker() {
             super(cctx.igniteInstanceName(), "partition-exchanger", GridCachePartitionExchangeManager.this.log);
-        }
-
-        /**
-         * Add first exchange future.
-         *
-         * @param exchFut Exchange future.
-         */
-        void addFirstExchangeFuture(GridDhtPartitionsExchangeFuture exchFut) {
-            futQ.addFirst(exchFut);
         }
 
         /**

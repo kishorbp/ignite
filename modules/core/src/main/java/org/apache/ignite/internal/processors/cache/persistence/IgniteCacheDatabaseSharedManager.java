@@ -134,12 +134,12 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
     ) {
         try {
             U.registerMBean(
-                    cfg.getMBeanServer(),
-                    cfg.getIgniteInstanceName(),
-                    "MemoryMetrics",
-                    memPlcCfg.getName(),
-                    new MemoryMetricsMXBeanImpl(memMetrics, memPlcCfg),
-                    MemoryMetricsMXBean.class);
+                cfg.getMBeanServer(),
+                cfg.getIgniteInstanceName(),
+                "MemoryMetrics",
+                memPlcCfg.getName(),
+                new MemoryMetricsMXBeanImpl(memMetrics, memPlcCfg),
+                MemoryMetricsMXBean.class);
         }
         catch (JMException e) {
             U.error(log, "Failed to register MBean for MemoryMetrics with name: '" + memMetrics.getName() + "'", e);
@@ -925,6 +925,9 @@ public class IgniteCacheDatabaseSharedManager extends GridCacheSharedManagerAdap
 
     /** {@inheritDoc} */
     @Override public void onActivate(GridKernalContext kctx) throws IgniteCheckedException {
+        if (cctx.kernalContext().clientNode() && cctx.kernalContext().config().getMemoryConfiguration() == null)
+            return;
+
         MemoryConfiguration memCfg = cctx.kernalContext().config().getMemoryConfiguration();
 
         assert memCfg != null;

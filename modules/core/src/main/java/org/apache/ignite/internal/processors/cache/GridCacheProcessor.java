@@ -832,9 +832,6 @@ public class GridCacheProcessor extends GridProcessorAdapter {
 
             cachesInfo.onKernalStart(checkConsistency);
 
-            if (active && !ctx.clientNode() && !ctx.isDaemon())
-                sharedCtx.database().lock();
-
             ctx.query().onCacheKernalStart();
 
             sharedCtx.exchange().onKernalStart(active, false);
@@ -2896,10 +2893,10 @@ public class GridCacheProcessor extends GridProcessorAdapter {
      * @param node Event node.
      * @param topVer Topology version.
      */
-    public void onDiscoveryEvent(int type, ClusterNode node, AffinityTopologyVersion topVer, DiscoveryDataClusterState state) {
+    public void onDiscoveryEvent(int type, DiscoveryCustomMessage customMsg, ClusterNode node, AffinityTopologyVersion topVer, DiscoveryDataClusterState state) {
         cachesInfo.onDiscoveryEvent(type, node, topVer);
 
-        sharedCtx.affinity().onDiscoveryEvent(type, node, topVer, state);
+        sharedCtx.affinity().onDiscoveryEvent(type, customMsg, node, topVer, state);
     }
 
     /**

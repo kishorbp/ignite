@@ -994,11 +994,25 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
 
             DiscoveryLocalJoinData joinData = ctx.discovery().localJoin();
 
+            IgniteInternalFuture<Boolean> transitionWaitFut = joinData.transitionWaitFuture();
+
+            boolean active;
+
+            if (transitionWaitFut != null) {
+                if (log.isInfoEnabled())
+                    log.info("Join cluster while cluster state transition is in progress, " +
+                        "waiting when transition finish.");
+
+                active = transitionWaitFut.get();
+            }
+            else
+                active = joinData.active();
+
             // Notify discovery manager the first to make sure that topology is discovered.
-            ctx.discovery().onKernalStart(joinData.active());
+            ctx.discovery().onKernalStart(active);
 
             // Notify IO manager the second so further components can send and receive messages.
-            ctx.io().onKernalStart(joinData.active());
+            ctx.io().onKernalStart(active);
 
             // Start plugins.
             for (PluginProvider provider : ctx.plugins().allProviders())
@@ -3688,10 +3702,11 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
      * @throws IgniteException if cluster in inActive state
      */
     private void checkClusterState() throws IgniteException {
-        if (!ctx.state().publicApiActiveState())
+        if (!ctx.state().publicApiActiveState()) {
             throw new IgniteException("Can not perform the operation because the cluster is inactive. Note, that " +
                 "the cluster is considered inactive by default if Ignite Persistent Store is used to let all the nodes " +
                 "join the cluster. To activate the cluster call Ignite.activate(true).");
+        }
     }
 
     /**

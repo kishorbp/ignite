@@ -18,7 +18,9 @@
 package org.apache.ignite.internal.managers.discovery;
 
 import org.apache.ignite.events.DiscoveryEvent;
+import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
+import org.jetbrains.annotations.Nullable;
 
 /**
  *
@@ -34,16 +36,27 @@ public class DiscoveryLocalJoinData {
     private final AffinityTopologyVersion joinTopVer;
 
     /** */
+    private final IgniteInternalFuture<Boolean> transitionWaitFut;
+
+    /** */
     private final boolean active;
 
-    public DiscoveryLocalJoinData(DiscoveryEvent evt, DiscoCache discoCache, boolean active) {
+    public DiscoveryLocalJoinData(DiscoveryEvent evt,
+        DiscoCache discoCache,
+        @Nullable IgniteInternalFuture<Boolean> transitionWaitFut,
+        boolean active) {
         assert evt != null && evt.topologyVersion() > 0 : evt;
 
         this.evt = evt;
         this.discoCache = discoCache;
+        this.transitionWaitFut = transitionWaitFut;
         this.active = active;
 
         joinTopVer = new AffinityTopologyVersion(evt.topologyVersion(), 0);
+    }
+
+    @Nullable public IgniteInternalFuture<Boolean> transitionWaitFuture() {
+        return transitionWaitFut;
     }
 
     public boolean active() {

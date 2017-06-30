@@ -41,6 +41,7 @@ import org.apache.ignite.events.Event;
 import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.cluster.ClusterTopologyServerNotFoundException;
 import org.apache.ignite.internal.managers.discovery.DiscoCache;
+import org.apache.ignite.internal.managers.discovery.DiscoveryCustomMessage;
 import org.apache.ignite.internal.managers.eventstorage.GridLocalEventListener;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.affinity.GridAffinityAssignmentCache;
@@ -52,6 +53,7 @@ import org.apache.ignite.internal.processors.cache.distributed.dht.GridDhtPartit
 import org.apache.ignite.internal.processors.cache.distributed.dht.GridDhtPartitionTopology;
 import org.apache.ignite.internal.processors.cache.distributed.dht.preloader.GridDhtPartitionFullMap;
 import org.apache.ignite.internal.processors.cache.distributed.dht.preloader.GridDhtPartitionsExchangeFuture;
+import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateFinishMessage;
 import org.apache.ignite.internal.processors.cluster.DiscoveryDataClusterState;
 import org.apache.ignite.internal.util.future.GridCompoundFuture;
 import org.apache.ignite.internal.util.future.GridFinishedFuture;
@@ -137,14 +139,22 @@ public class CacheAffinitySharedManager<K, V> extends GridCacheSharedManagerAdap
         cctx.kernalContext().event().addLocalEventListener(discoLsnr, EVT_NODE_LEFT, EVT_NODE_FAILED);
     }
 
+    /** */
+    private boolean initCaches;
+
     /**
      * Callback invoked from discovery thread when discovery message is received.
      *
      * @param type Event type.
      * @param node Event node.
      * @param topVer Topology version.
+     * @param state Cluster state.
      */
-    void onDiscoveryEvent(int type, ClusterNode node, AffinityTopologyVersion topVer, DiscoveryDataClusterState state) {
+    void onDiscoveryEvent(int type,
+        DiscoveryCustomMessage customMsg,
+        ClusterNode node,
+        AffinityTopologyVersion topVer,
+        DiscoveryDataClusterState state) {
         if (state.transition() || !state.active())
             return;
 
@@ -157,6 +167,15 @@ public class CacheAffinitySharedManager<K, V> extends GridCacheSharedManagerAdap
             lastAffVer = null;
 
             caches.init(cctx.cache().cacheGroupDescriptors(), cctx.cache().cacheDescriptors());
+
+            initCaches = true;
+        }
+        else if (customMsg instanceof ChangeGlobalStateFinishMessage) {
+            if (!initCaches && ((ChangeGlobalStateFinishMessage)customMsg).clusterActive()) {
+                caches.init(cctx.cache().cacheGroupDescriptors(), cctx.cache().cacheDescriptors());
+
+                initCaches = true;
+            }
         }
 
         if (!CU.clientNode(node) && (type == EVT_NODE_FAILED || type == EVT_NODE_JOINED || type == EVT_NODE_LEFT)) {

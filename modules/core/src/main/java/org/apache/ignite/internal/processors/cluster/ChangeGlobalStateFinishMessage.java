@@ -19,6 +19,7 @@ package org.apache.ignite.internal.processors.cluster;
 
 import java.util.UUID;
 import org.apache.ignite.internal.managers.discovery.DiscoveryCustomMessage;
+import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.lang.IgniteUuid;
 import org.jetbrains.annotations.Nullable;
 
@@ -64,5 +65,10 @@ public class ChangeGlobalStateFinishMessage implements DiscoveryCustomMessage {
     /** {@inheritDoc} */
     @Override public boolean isMutable() {
         return false;
+    }
+
+    /** {@inheritDoc} */
+    @Override public String toString() {
+        return S.toString(ChangeGlobalStateFinishMessage.class, this);
     }
 }
