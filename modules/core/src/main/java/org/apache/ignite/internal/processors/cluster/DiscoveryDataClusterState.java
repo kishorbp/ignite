@@ -32,6 +32,9 @@ import org.jetbrains.annotations.Nullable;
  */
 public class DiscoveryDataClusterState implements Serializable {
     /** */
+    private static final long serialVersionUID = 0L;
+
+    /** */
     private final boolean active;
 
     /** */
