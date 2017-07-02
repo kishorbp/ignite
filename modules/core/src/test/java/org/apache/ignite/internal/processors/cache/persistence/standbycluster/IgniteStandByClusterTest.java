@@ -114,7 +114,7 @@ public class IgniteStandByClusterTest extends GridCommonAbstractTest {
         Map<String, GridCacheAdapter<?, ?>> caches = U.field(ig3.context().cache(), "caches");
 
         // Only system cache and cache0
-        assertTrue(caches.size() == 2);
+        assertEquals("Unexpected caches: " + caches.keySet(), 2, caches.size());
         assertTrue(caches.containsKey(CU.UTILITY_CACHE_NAME));
         assertTrue(caches.containsKey(cacheName0));
 
@@ -155,12 +155,6 @@ public class IgniteStandByClusterTest extends GridCommonAbstractTest {
         assertTrue(!ig1.active());
         assertTrue(!ig2.active());
         assertTrue(!ig3.active());
-
-        for (IgniteEx ig : Arrays.asList(ig1, ig2, ig3)) {
-            Map<String, DynamicCacheDescriptor> desc = U.field(U.field(ig.context().cache(), "cachesInfo"), "registeredCaches");
-
-            assertEquals(0, desc.size());
-        }
 
         ig3.active(true);
 
