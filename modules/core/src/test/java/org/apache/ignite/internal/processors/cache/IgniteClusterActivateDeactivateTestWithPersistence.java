@@ -18,7 +18,10 @@
 package org.apache.ignite.internal.processors.cache;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.ignite.Ignite;
+import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.testframework.GridTestUtils;
 
 /**
@@ -84,6 +87,16 @@ public class IgniteClusterActivateDeactivateTestWithPersistence extends IgniteCl
 
         srv.createCaches(Arrays.asList(cacheConfigurations1()));
 
+        Map<Integer, Integer> cacheData = new LinkedHashMap<>();
+
+        for (int i = 1; i <= 100; i++) {
+            for (CacheConfiguration ccfg : cacheConfigurations1()) {
+                srv.cache(ccfg.getName()).put(-i, i);
+
+                cacheData.put(-i, i);
+            }
+        }
+
         stopAllGrids();
 
         for (int i = 0; i < srvs; i++) {
@@ -105,6 +118,9 @@ public class IgniteClusterActivateDeactivateTestWithPersistence extends IgniteCl
             for (int c = 0; c < CACHES; c++)
                 checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
         }
+
+        for (CacheConfiguration ccfg : cacheConfigurations1())
+            checkCacheData(cacheData, ccfg.getName());
 
         checkCaches(srvs, CACHES);
 
@@ -134,5 +150,8 @@ public class IgniteClusterActivateDeactivateTestWithPersistence extends IgniteCl
             for (int c = 0; c < CACHES; c++)
                 checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
         }
+
+        for (CacheConfiguration ccfg : cacheConfigurations1())
+            checkCacheData(cacheData, ccfg.getName());
     }
 }
