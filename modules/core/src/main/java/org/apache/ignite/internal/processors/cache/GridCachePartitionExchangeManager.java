@@ -344,8 +344,6 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
     };
 
     private void processEventInactive(DiscoveryEvent evt, DiscoCache cache) {
-        assert false;
-
         log.info("Ignore event: " + evt);
 
         // TODO GG-12389: finish operations with error.
