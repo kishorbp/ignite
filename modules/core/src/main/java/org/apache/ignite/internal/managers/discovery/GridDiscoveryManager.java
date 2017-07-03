@@ -699,6 +699,8 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
 
                     discoEvt.topologySnapshot(topVer, new ArrayList<>(F.view(topSnapshot, FILTER_DAEMON)));
 
+                    discoWrk.discoCache = discoCache;
+
                     ctx.cache().context().exchange().onLocalJoin(discoEvt, discoCache);
 
                     locJoin.onDone(new DiscoveryLocalJoinData(discoEvt,
@@ -2627,7 +2629,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                         customEvt.customMessage(evt.get6());
 
                         if (evt.get4() == null) {
-                            assert discoCache != null;
+                            assert discoCache != null : evt.get6();
 
                             evt.set4(discoCache);
                         }

@@ -1071,6 +1071,8 @@ class ClusterCachesInfo {
 
     /**
      * @param msg Message.
+     * @param topVer Current topology version.
+     * @return Exchange action.
      */
     ExchangeActions onStateChangeRequest(ChangeGlobalStateMessage msg, AffinityTopologyVersion topVer) {
         ExchangeActions exchangeActions = new ExchangeActions();
@@ -1107,14 +1109,17 @@ class ClusterCachesInfo {
             if (storedCfgs != null) {
                 List<DynamicCacheChangeRequest> reqs = new ArrayList<>();
 
+                IgniteUuid deplymentId = IgniteUuid.fromUuid(msg.requestId());
+
                 for (StoredCacheData storedCfg : storedCfgs) {
                     CacheConfiguration ccfg = storedCfg.config();
 
                     if (!registeredCaches.containsKey(ccfg.getName())) {
                         DynamicCacheChangeRequest req = new DynamicCacheChangeRequest(msg.requestId(),
                             ccfg.getName(),
-                            null);
+                            msg.initiatorNodeId());
 
+                        req.deploymentId(deplymentId);
                         req.startCacheConfiguration(ccfg);
                         req.cacheType(ctx.cache().cacheType(ccfg.getName()));
                         req.schema(new QuerySchema(storedCfg.queryEntities()));
@@ -1126,7 +1131,7 @@ class ClusterCachesInfo {
                 CacheChangeProcessResult res = processCacheChangeRequests(exchangeActions, reqs, topVer, true);
 
                 if (!res.errs.isEmpty()) {
-
+                    // TODO GG-12389.
                 }
             }
         }

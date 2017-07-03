@@ -56,16 +56,16 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
     private static final TcpDiscoveryIpFinder IP_FINDER = new TcpDiscoveryVmIpFinder(true);
 
     /** */
-    protected static final String CACHE_NAME_PREFIX = "cache-";
+    static final String CACHE_NAME_PREFIX = "cache-";
 
     /** */
-    private boolean client;
+    boolean client;
 
     /** */
     private boolean active = true;
 
     /** */
-    private CacheConfiguration[] ccfgs;
+    CacheConfiguration[] ccfgs;
 
     /** */
     private boolean testSpi;
@@ -263,7 +263,7 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
      * @throws Exception If failed.
      */
     private void joinWhileActivate1(final boolean startClient, final boolean withNewCache) throws Exception {
-        IgniteInternalFuture<?> activeFut = startNodesAndBlockActivation(2, 0);
+        IgniteInternalFuture<?> activeFut = startNodesAndBlockStatusChange(2, 0, false);
 
         IgniteInternalFuture<?> startFut = GridTestUtils.runAsync(new Callable<Void>() {
             @Override public Void call() throws Exception {
@@ -297,16 +297,29 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
         awaitPartitionMapExchange();
 
         checkCaches(3, withNewCache ? 4 : 2);
+
+        client = false;
+
+        startGrid(3);
+
+        checkCaches(4, withNewCache ? 4 : 2);
+
+        client = true;
+
+        startGrid(4);
+
+        checkCaches(5, withNewCache ? 4 : 2);
     }
 
     /**
      * @param srvs Number of servers.
      * @param clients Number of clients.
+     * @param initiallyActive If {@code true} start cluster in active state (otherwise in inactive).
      * @return Activation future.
      * @throws Exception If failed.
      */
-    private IgniteInternalFuture<?> startNodesAndBlockActivation(int srvs, int clients) throws Exception {
-        active = false;
+    private IgniteInternalFuture<?> startNodesAndBlockStatusChange(int srvs, int clients, boolean initiallyActive) throws Exception {
+        active = initiallyActive;
         testSpi = true;
 
         for (int i = 0; i < srvs + clients; i++) {
@@ -317,16 +330,19 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
             startGrid(i);
         }
 
+        if (initiallyActive && persistenceEnabled())
+            ignite(0).active(true);
+
         TestRecordingCommunicationSpi spi1 = TestRecordingCommunicationSpi.spi(ignite(1));
 
-        final AffinityTopologyVersion ACTIVATE_TOP_VER = new AffinityTopologyVersion(srvs + clients, 1);
+        final AffinityTopologyVersion STATE_CHANGE_TOP_VER = new AffinityTopologyVersion(srvs + clients, 1);
 
         spi1.blockMessages(new IgniteBiPredicate<ClusterNode, Message>() {
             @Override public boolean apply(ClusterNode clusterNode, Message msg) {
                 if (msg instanceof GridDhtPartitionsSingleMessage) {
                     GridDhtPartitionsSingleMessage pMsg = (GridDhtPartitionsSingleMessage)msg;
 
-                    if (pMsg.exchangeId() != null && pMsg.exchangeId().topologyVersion().equals(ACTIVATE_TOP_VER))
+                    if (pMsg.exchangeId() != null && pMsg.exchangeId().topologyVersion().equals(STATE_CHANGE_TOP_VER))
                         return true;
                 }
 
@@ -347,6 +363,13 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
         assertFalse(activeFut.isDone());
 
         return activeFut;
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testJoinWhileDeactivate1_Server() throws Exception {
+        joinWhileActivate1(false, false);
     }
 
     /**

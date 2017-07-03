@@ -48,21 +48,36 @@ public class IgniteClusterActivateDeactivateTestWithPersistence extends IgniteCl
      * @throws Exception If failed.
      */
     public void testActivateCachesRestore_SingleNode() throws Exception {
-        activateCachesRestore(1);
+        activateCachesRestore(1, false);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testActivateCachesRestore_SingleNode_WithNewCaches() throws Exception {
+        activateCachesRestore(1, true);
     }
 
     /**
      * @throws Exception If failed.
      */
     public void testActivateCachesRestore_5_Servers() throws Exception {
-        activateCachesRestore(5);
+        activateCachesRestore(5, false);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testActivateCachesRestore_5_Servers_WithNewCaches() throws Exception {
+        activateCachesRestore(5, false);
     }
 
     /**
      * @param srvs Number of server nodes.
+     * @param withNewCaches If {@code true} then after restart has new caches in configuration.
      * @throws Exception If failed.
      */
-    private void activateCachesRestore(int srvs) throws Exception {
+    private void activateCachesRestore(int srvs, boolean withNewCaches) throws Exception {
         Ignite srv = startGrids(srvs);
 
         srv.active(true);
@@ -71,17 +86,53 @@ public class IgniteClusterActivateDeactivateTestWithPersistence extends IgniteCl
 
         stopAllGrids();
 
-        srv = startGrids(srvs);
+        for (int i = 0; i < srvs; i++) {
+            if (withNewCaches)
+                ccfgs = cacheConfigurations2();
+
+            startGrid(i);
+        }
+
+        srv = ignite(0);
 
         checkNoCaches(srvs);
 
         srv.active(true);
 
+        final int CACHES = withNewCaches ? 4 : 2;
+
         for (int i = 0; i < srvs; i++) {
-            for (int c = 0; c < 2; c++)
+            for (int c = 0; c < CACHES; c++)
                 checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
         }
 
-        checkCaches(srvs, 2);
+        checkCaches(srvs, CACHES);
+
+        int nodes = srvs;
+
+        client = false;
+
+        startGrid(nodes++);
+
+        for (int i = 0; i < nodes; i++) {
+            for (int c = 0; c < CACHES; c++)
+                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+        }
+
+        checkCaches(nodes, CACHES);
+
+        client = true;
+
+        startGrid(nodes++);
+
+        for (int c = 0; c < CACHES; c++)
+            checkCache(ignite(nodes - 1), CACHE_NAME_PREFIX + c, false);
+
+        checkCaches(nodes, CACHES);
+
+        for (int i = 0; i < nodes; i++) {
+            for (int c = 0; c < CACHES; c++)
+                checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+        }
     }
 }

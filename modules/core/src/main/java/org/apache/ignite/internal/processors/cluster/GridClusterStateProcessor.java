@@ -313,7 +313,8 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     @Override public void stop(boolean cancel) throws IgniteCheckedException {
         super.stop(cancel);
 
-        sharedCtx.io().removeHandler(false, 0, GridChangeGlobalStateMessageResponse.class);
+        if (sharedCtx != null)
+            sharedCtx.io().removeHandler(false, 0, GridChangeGlobalStateMessageResponse.class);
 
         ctx.event().removeLocalEventListener(lsr, EVT_NODE_LEFT, EVT_NODE_FAILED);
 
