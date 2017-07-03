@@ -347,7 +347,7 @@ public class ExchangeActions {
     /**
      *
      */
-    static class ActionData {
+    public static class ActionData {
         /** */
         private final DynamicCacheChangeRequest req;
 

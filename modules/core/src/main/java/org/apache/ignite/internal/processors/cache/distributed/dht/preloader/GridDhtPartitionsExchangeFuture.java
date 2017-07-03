@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteLogger;
 import org.apache.ignite.cluster.ClusterNode;
+import org.apache.ignite.configuration.NearCacheConfiguration;
 import org.apache.ignite.events.CacheEvent;
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.events.Event;
@@ -603,9 +604,22 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                     else {
                         cctx.activate();
 
-                        cctx.cache().startCachesOnLocalJoin(topVer);
+                        List<T2<DynamicCacheDescriptor, NearCacheConfiguration>> caches =
+                            cctx.cache().cachesToStartOnLocalJoin();
 
-                        cctx.database().readCheckpointAndRestoreMemory();
+                        if (cctx.database().persistenceEnabled() &&
+                            !cctx.kernalContext().clientNode()) {
+                            List<DynamicCacheDescriptor> startDescs = new ArrayList<>();
+
+                            if (caches != null) {
+                                for (T2<DynamicCacheDescriptor, NearCacheConfiguration> c : caches)
+                                    startDescs.add(c.get1());
+                            }
+
+                            cctx.database().readCheckpointAndRestoreMemory(startDescs);
+                        }
+
+                        cctx.cache().startCachesOnLocalJoin(caches, topVer);
                     }
                 }
 
@@ -750,9 +764,18 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
             try {
                 cctx.activate();
 
-                cctx.affinity().onCacheChangeRequest(this, crd, exchActions);
+                List<DynamicCacheDescriptor> startDescs = null;
 
-                cctx.database().readCheckpointAndRestoreMemory();
+                if (cctx.database().persistenceEnabled() && !cctx.kernalContext().clientNode()) {
+                    startDescs = new ArrayList<>();
+
+                    for (ExchangeActions.ActionData startReq : exchActions.cacheStartRequests())
+                        startDescs.add(startReq.descriptor());
+
+                    cctx.database().readCheckpointAndRestoreMemory(startDescs);
+                }
+
+                cctx.affinity().onCacheChangeRequest(this, crd, exchActions);
 
                 if (log.isInfoEnabled()) {
                     log.info("Successfully activated caches [nodeId=" + cctx.localNodeId() +
