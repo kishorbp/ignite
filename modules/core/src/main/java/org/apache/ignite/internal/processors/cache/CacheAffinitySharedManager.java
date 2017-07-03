@@ -146,12 +146,13 @@ public class CacheAffinitySharedManager<K, V> extends GridCacheSharedManagerAdap
      * Callback invoked from discovery thread when discovery message is received.
      *
      * @param type Event type.
+     * @param customMsg Custom message instance.
      * @param node Event node.
      * @param topVer Topology version.
      * @param state Cluster state.
      */
     void onDiscoveryEvent(int type,
-        DiscoveryCustomMessage customMsg,
+        @Nullable DiscoveryCustomMessage customMsg,
         ClusterNode node,
         AffinityTopologyVersion topVer,
         DiscoveryDataClusterState state) {

@@ -33,21 +33,33 @@ public class ChangeGlobalStateFinishMessage implements DiscoveryCustomMessage {
     /** Custom message ID. */
     private IgniteUuid id = IgniteUuid.randomUuid();
 
-    /** */
+    /** State change request ID. */
     private UUID reqId;
 
-    /** */
+    /** New cluster state. */
     private boolean clusterActive;
 
+    /**
+     * @param reqId State change request ID.
+     * @param clusterActive New cluster state.
+     */
     public ChangeGlobalStateFinishMessage(UUID reqId, boolean clusterActive) {
+        assert reqId != null;
+
         this.reqId = reqId;
         this.clusterActive = clusterActive;
     }
 
+    /**
+     * @return State change request ID.
+     */
     public UUID requestId() {
         return reqId;
     }
 
+    /**
+     * @return New cluster state.
+     */
     public boolean clusterActive() {
         return clusterActive;
     }

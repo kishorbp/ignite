@@ -76,7 +76,7 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     /** Local action future. */
     private final AtomicReference<GridChangeGlobalStateFuture> stateChangeFut = new AtomicReference<>();
 
-    /** */
+    /** Future initialized if node joins when cluster state change is in progress. */
     private TransitionOnJoinWaitFuture joinFut;
 
     /** Process. */
@@ -168,15 +168,15 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
      * @param msg Message.
      */
     public void onStateFinishMessage(ChangeGlobalStateFinishMessage msg) {
-        if (joinFut != null)
-            joinFut.onDone(msg.clusterActive());
-
         if (msg.requestId().equals(globalState.transitionRequestId())) {
             log.info("Received state change finish message: " + msg.clusterActive());
 
             globalState = DiscoveryDataClusterState.createState(msg.clusterActive());
 
             ctx.cache().onStateChangeFinish(msg);
+
+            if (joinFut != null)
+                joinFut.onDone(msg.clusterActive());
         }
         else
             U.warn(log, "Received state finish message with unexpected ID: " + msg);
@@ -348,7 +348,8 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     }
 
     /**
-     *
+     * @param activate New cluster state.
+     * @return State change future.
      */
     public IgniteInternalFuture<?> changeGlobalState(final boolean activate) {
         if (ctx.isDaemon() || ctx.clientNode()) {
@@ -434,9 +435,10 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     }
 
     /**
-     *
+     * @param activate New cluster state.
+     * @param resFut State change future.
      */
-    private void sendCompute(boolean activate, final GridFutureAdapter<Void> res) {
+    private void sendCompute(boolean activate, final GridFutureAdapter<Void> resFut) {
         AffinityTopologyVersion topVer = ctx.discovery().topologyVersionEx();
 
         IgniteCompute comp = ((ClusterGroupAdapter)ctx.cluster().get().forServers()).compute();
@@ -455,17 +457,18 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
                 try {
                     fut.get();
 
-                    res.onDone();
+                    resFut.onDone();
                 }
                 catch (Exception e) {
-                    res.onDone(e);
+                    resFut.onDone(e);
                 }
             }
         });
     }
 
     /**
-     * @param exs Exs.
+     * @param exs Errors.
+     * @param req State change request.
      */
     public void onStateChangeError(Map<UUID, Exception> exs, StateChangeRequest req) {
         assert !F.isEmpty(exs);
@@ -514,65 +517,6 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
                 e.addSuppressed(entry.getValue());
 
             af.onDone(e);
-        }
-    }
-
-    /**
-     *
-     */
-    private Exception onActivate(AffinityTopologyVersion topVer) {
-        if (log.isInfoEnabled()) {
-            log.info("Start activation process [nodeId=" + ctx.localNodeId() +
-                ", client=" + ctx.clientNode() +
-                ", topVer=" + topVer + "]");
-        }
-
-        try {
-            sharedCtx.activate();
-
-            if (log.isInfoEnabled()) {
-                log.info("Successfully activated persistence managers [nodeId=" + ctx.localNodeId() +
-                    ", client=" + ctx.clientNode() +
-                    ", topVer=" + topVer + "]");
-            }
-
-            return null;
-        }
-        catch (Exception e) {
-            U.error(log, "Failed to activate persistence managers [nodeId=" + ctx.localNodeId() +
-                ", client=" + ctx.clientNode() +
-                ", topVer=" + topVer + "]", e);
-
-            return e;
-        }
-    }
-
-    /**
-     *
-     */
-    private Exception onDeActivate(AffinityTopologyVersion topVer) {
-        final boolean client = ctx.clientNode();
-
-        if (log.isInfoEnabled())
-            log.info("Starting deactivation [id=" + ctx.localNodeId() + ", client=" +
-                client + ", topVer=" + topVer + "]");
-
-        try {
-            ctx.dataStructures().onDeActivate(ctx);
-
-            ctx.service().onDeActivate(ctx);
-
-            if (log.isInfoEnabled())
-                log.info("Successfully deactivated persistence processors [id=" + ctx.localNodeId() + ", client=" +
-                    client + ", topVer=" + topVer + "]");
-
-            return null;
-        }
-        catch (Exception e) {
-            U.error(log, "Failed to execute deactivation callback [nodeId=" + ctx.localNodeId() + ", client=" + client +
-                ", topVer=" + topVer + "]", e);
-
-            return e;
         }
     }
 

@@ -195,6 +195,9 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
     /** */
     private DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
 
+    /** Events received while cluster state transition was in progress. */
+    private final List<PendingDiscoveryEvent> pendingEvts = new ArrayList<>();
+
     /** {@inheritDoc} */
     @Override protected void start0() throws IgniteCheckedException {
         super.start0();
@@ -261,10 +264,9 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
         }
     }
 
-    /** */
-    private final List<PendingDiscoveryEvent> pendingEvts = new ArrayList<>();
-
     /**
+     * Callback for local join event (needed since now regular event for local join is not generated).
+     *
      * @param evt Event.
      * @param cache Cache.
      */
@@ -342,6 +344,8 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
     };
 
     private void processEventInactive(DiscoveryEvent evt, DiscoCache cache) {
+        assert false;
+
         log.info("Ignore event: " + evt);
 
         // TODO GG-12389: finish operations with error.
@@ -445,7 +449,7 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
     /**
      * @param task Task to run in exchange worker thread.
      */
-    public void addCustomTask(CachePartitionExchangeWorkerTask task) {
+    void addCustomTask(CachePartitionExchangeWorkerTask task) {
         assert task != null;
 
         exchWorker.addCustomTask(task);
@@ -485,7 +489,6 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
         GridDhtPartitionsExchangeFuture fut = null;
 
         if (active) {
-            // Generate dummy discovery event for local node joining.
             DiscoveryEvent discoEvt = locJoin.event();
             DiscoCache discoCache = locJoin.discoCache();
 
@@ -1732,28 +1735,6 @@ public class GridCachePartitionExchangeManager<K, V> extends GridCacheSharedMana
 
         if (ctx != null && fut instanceof IgniteDiagnosticAware)
             ((IgniteDiagnosticAware)fut).addDiagnosticRequest(ctx);
-    }
-
-    /**
-     * @param deque Deque to poll from.
-     * @param time Time to wait.
-     * @param w Worker.
-     * @return Polled item.
-     * @throws InterruptedException If interrupted.
-     */
-    @Nullable private <T> T poll(BlockingQueue<T> deque, long time, GridWorker w) throws InterruptedException {
-        assert w != null;
-
-        // There is currently a case where {@code interrupted}
-        // flag on a thread gets flipped during stop which causes the pool to hang.  This check
-        // will always make sure that interrupted flag gets reset before going into wait conditions.
-        // The true fix should actually make sure that interrupted flag does not get reset or that
-        // interrupted exception gets propagated. Until we find a real fix, this method should
-        // always work to make sure that there is no hanging during stop.
-        if (w.isCancelled())
-            Thread.currentThread().interrupt();
-
-        return deque.poll(time, MILLISECONDS);
     }
 
     /**

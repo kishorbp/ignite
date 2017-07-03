@@ -20,6 +20,7 @@ package org.apache.ignite.internal.processors.cache;
 import java.util.UUID;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cluster.ChangeGlobalStateMessage;
+import org.apache.ignite.internal.util.typedef.internal.S;
 
 /**
  *
@@ -28,10 +29,12 @@ public class StateChangeRequest {
     /** */
     private final ChangeGlobalStateMessage msg;
 
+    /** */
     private final AffinityTopologyVersion topVer;
 
     /**
      * @param msg Message.
+     * @param topVer State change topology versoin.
      */
     public StateChangeRequest(ChangeGlobalStateMessage msg,
         AffinityTopologyVersion topVer) {
@@ -56,5 +59,10 @@ public class StateChangeRequest {
      */
     public UUID initiatorNodeId() {
         return msg.initiatorNodeId();
+    }
+
+    /** {@inheritDoc} */
+    @Override public String toString() {
+        return S.toString(StateChangeRequest.class, this);
     }
 }

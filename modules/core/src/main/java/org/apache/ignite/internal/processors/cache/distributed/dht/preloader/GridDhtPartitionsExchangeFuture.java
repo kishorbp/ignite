@@ -459,6 +459,9 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
         evtLatch.countDown();
     }
 
+    /**
+     * @return {@code True} if cluster state change exchange.
+     */
     private boolean stateChangeExchange() {
         return exchActions != null && exchActions.stateChangeRequest() != null;
     }
@@ -1213,7 +1216,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
         if (partHistReserved0 != null)
             m.partitionHistoryCounters(partHistReserved0);
 
-        if (activateCluster() && changeGlobalStateE != null)
+        if (stateChangeExchange() && changeGlobalStateE != null)
             m.setException(changeGlobalStateE);
 
         if (log.isDebugEnabled())
@@ -1818,9 +1821,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                 }
             }
 
-            if (discoEvt.type() == EVT_NODE_JOINED) {
+            if (discoEvt.type() == EVT_NODE_JOINED)
                 assignPartitionsStates();
-            }
             else if (discoEvt.type() == EVT_DISCOVERY_CUSTOM_EVT) {
                 assert discoEvt instanceof DiscoveryCustomEvent;
 
@@ -1873,7 +1875,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                     if (!F.isEmpty(changeGlobalStateExceptions))
                         cctx.kernalContext().state().onStateChangeError(changeGlobalStateExceptions, req);
 
-                    // TODO GG-12389 (case when sent full message but failed before custom message sent)
+                    // TODO GG-12389 (check result + case when sent full message but failed before custom message sent)
                     ChangeGlobalStateFinishMessage msg = new ChangeGlobalStateFinishMessage(req.requestId(),
                         req.activate());
 

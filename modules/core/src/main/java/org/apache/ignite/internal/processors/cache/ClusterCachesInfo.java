@@ -99,7 +99,7 @@ class ClusterCachesInfo {
     /** */
     private Map<UUID, CacheClientReconnectDiscoveryData> clientReconnectReqs;
 
-    /** */
+    /** {@code True} if joined cluster while cluster state change was in progress. */
     private boolean joinOnTransition;
 
     /**
@@ -349,13 +349,14 @@ class ClusterCachesInfo {
      * @param exchangeActions Exchange actions to update.
      * @param reqs Requests.
      * @param topVer Topology version.
+     * @param persistedCfgs {@code True} if process start of persisted caches during cluster activation.
      * @return {@code True} if minor topology version should be increased.
      */
-    CacheChangeProcessResult processCacheChangeRequests(
+    private CacheChangeProcessResult processCacheChangeRequests(
         ExchangeActions exchangeActions,
         Collection<DynamicCacheChangeRequest> reqs,
         AffinityTopologyVersion topVer,
-        boolean onClusterActivate) {
+        boolean persistedCfgs) {
         CacheChangeProcessResult res = new CacheChangeProcessResult();
 
         final List<T2<DynamicCacheChangeRequest, AffinityTopologyVersion>> reqsToComplete = new ArrayList<>();
@@ -387,7 +388,7 @@ class ClusterCachesInfo {
                     res.addedDescs.add(templateDesc);
                 }
 
-                if (!onClusterActivate)
+                if (!persistedCfgs)
                     ctx.cache().completeTemplateAddFuture(ccfg.getName(), req.deploymentId());
 
                 continue;
@@ -414,7 +415,7 @@ class ClusterCachesInfo {
                         IgniteCheckedException err = new IgniteCheckedException("Failed to start " +
                             "cache. " + conflictErr);
 
-                        if (onClusterActivate)
+                        if (persistedCfgs)
                             res.errs.add(err);
                         else
                             ctx.cache().completeCacheStartFuture(req, false, err);
@@ -423,7 +424,7 @@ class ClusterCachesInfo {
                     }
 
                     if (req.clientStartOnly()) {
-                        assert !onClusterActivate;
+                        assert !persistedCfgs;
 
                         ctx.cache().completeCacheStartFuture(req, false, new IgniteCheckedException("Failed to start " +
                             "client cache (a cache with the given name is not started): " + req.cacheName()));
@@ -433,7 +434,7 @@ class ClusterCachesInfo {
                             req.startCacheConfiguration(), registeredCaches.values());
 
                         if (err != null) {
-                            if (onClusterActivate)
+                            if (persistedCfgs)
                                 res.errs.add(err);
                             else
                                 ctx.cache().completeCacheStartFuture(req, false, err);
@@ -478,13 +479,11 @@ class ClusterCachesInfo {
                             ccfg.getName(),
                             ccfg.getNearConfiguration() != null);
 
-                        if (req.initiatingNodeId() != null) {
+                        if (!persistedCfgs) {
                             ctx.discovery().addClientNode(req.cacheName(),
                                 req.initiatingNodeId(),
                                 req.nearCacheConfiguration() != null);
                         }
-                        else
-                            assert onClusterActivate;
 
                         res.addedDescs.add(startDesc);
 
@@ -494,7 +493,7 @@ class ClusterCachesInfo {
                     }
                 }
                 else {
-                    assert !onClusterActivate;
+                    assert !persistedCfgs;
                     assert req.initiatingNodeId() != null : req;
 
                     if (req.failIfExists()) {
@@ -1059,7 +1058,7 @@ class ClusterCachesInfo {
     }
 
     /**
-     *
+     * @param msg Message.
      */
     void onStateChangeFinish(ChangeGlobalStateFinishMessage msg) {
         if (joinOnTransition) {

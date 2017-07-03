@@ -836,11 +836,16 @@ public class GridCacheProcessor extends GridProcessorAdapter {
 
             ctx.query().onCacheKernalStart();
 
+            sharedCtx.mvcc().onKernalStart();
+
             sharedCtx.exchange().onKernalStart(active, false);
         }
         finally {
             cacheStartedLatch.countDown();
         }
+
+        if (!ctx.clientNode() && !ctx.isDaemon())
+            addRemovedItemsCleanupTask(Long.getLong(IGNITE_CACHE_REMOVED_ENTRIES_TTL, 10_000));
 
         // Escape if cluster inactive.
         if (!active)
@@ -872,9 +877,6 @@ public class GridCacheProcessor extends GridProcessorAdapter {
             syncFuts.get(i).get();
 
         assert ctx.config().isDaemon() || caches.containsKey(CU.UTILITY_CACHE_NAME) : "Utility cache should be started";
-
-        if (!ctx.clientNode() && !ctx.isDaemon())
-            addRemovedItemsCleanupTask(Long.getLong(IGNITE_CACHE_REMOVED_ENTRIES_TTL, 10_000));
     }
 
     /**
@@ -2900,10 +2902,16 @@ public class GridCacheProcessor extends GridProcessorAdapter {
 
     /**
      * @param type Event type.
+     * @param customMsg Custom message instance.
      * @param node Event node.
      * @param topVer Topology version.
+     * @param state Cluster state.
      */
-    public void onDiscoveryEvent(int type, DiscoveryCustomMessage customMsg, ClusterNode node, AffinityTopologyVersion topVer, DiscoveryDataClusterState state) {
+    public void onDiscoveryEvent(int type,
+        @Nullable DiscoveryCustomMessage customMsg,
+        ClusterNode node,
+        AffinityTopologyVersion topVer,
+        DiscoveryDataClusterState state) {
         cachesInfo.onDiscoveryEvent(type, node, topVer);
 
         sharedCtx.affinity().onDiscoveryEvent(type, customMsg, node, topVer, state);

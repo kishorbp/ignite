@@ -22,6 +22,7 @@ import java.util.UUID;
 import org.apache.ignite.internal.managers.discovery.DiscoveryCustomMessage;
 import org.apache.ignite.internal.processors.cache.ExchangeActions;
 import org.apache.ignite.internal.processors.cache.StoredCacheData;
+import org.apache.ignite.internal.util.tostring.GridToStringExclude;
 import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.lang.IgniteUuid;
 import org.jetbrains.annotations.Nullable;
@@ -45,21 +46,28 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     /** If true activate else deactivate. */
     private boolean activate;
 
-    /** */
+    /** Configurations read from persistent store. */
     private List<StoredCacheData> storedCfgs;
 
     /** */
+    @GridToStringExclude
     private transient ExchangeActions exchangeActions;
 
     /**
-     *
+     * @param requestId State change request ID.
+     * @param initiatingNodeId Node initiated state change.
+     * @param storedCfgs Configurations read from persistent store.
+     * @param activate New cluster state.
      */
     public ChangeGlobalStateMessage(
         UUID requestId,
         UUID initiatingNodeId,
-        List<StoredCacheData> storedCfgs,
+        @Nullable List<StoredCacheData> storedCfgs,
         boolean activate
     ) {
+        assert requestId != null;
+        assert initiatingNodeId != null;
+
         this.requestId = requestId;
         this.initiatingNodeId = initiatingNodeId;
         this.storedCfgs = storedCfgs;
@@ -67,7 +75,7 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     }
 
     /**
-     * @return Stored cache configurations.
+     * @return Configurations read from persistent store..
      */
     @Nullable public List<StoredCacheData> storedCacheConfigurations() {
         return storedCfgs;
@@ -83,7 +91,7 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     /**
      * @param exchangeActions Cache updates to be executed on exchange.
      */
-    public void exchangeActions(ExchangeActions exchangeActions) {
+    void exchangeActions(ExchangeActions exchangeActions) {
         assert exchangeActions != null && !exchangeActions.empty() : exchangeActions;
 
         this.exchangeActions = exchangeActions;
@@ -105,21 +113,21 @@ public class ChangeGlobalStateMessage implements DiscoveryCustomMessage {
     }
 
    /**
-     *
-     */
+    * @return Node initiated state change.
+    */
     public UUID initiatorNodeId() {
         return initiatingNodeId;
     }
 
     /**
-     *
+     * @return New cluster state.
      */
     public boolean activate() {
         return activate;
     }
 
     /**
-     *
+     * @return State change request ID.
      */
     public UUID requestId() {
         return requestId;

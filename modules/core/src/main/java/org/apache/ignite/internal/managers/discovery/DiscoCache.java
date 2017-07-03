@@ -125,6 +125,9 @@ public class DiscoCache {
         this.alives.addAll(alives);
     }
 
+    /**
+     * @return Current cluster state.
+     */
     public DiscoveryDataClusterState state() {
         return state;
     }

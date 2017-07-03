@@ -19,6 +19,7 @@ package org.apache.ignite.internal.processors.cache;
 
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.internal.managers.discovery.DiscoCache;
+import org.apache.ignite.internal.util.typedef.internal.S;
 
 /**
  *
@@ -39,11 +40,22 @@ public class PendingDiscoveryEvent {
         this.cache = cache;
     }
 
+    /**
+     * @return Event.
+     */
     public DiscoveryEvent event() {
         return evt;
     }
 
+    /**
+     * @return Discovery data cache.
+     */
     public DiscoCache discoCache() {
         return cache;
+    }
+
+    /** {@inheritDoc} */
+    @Override public String toString() {
+        return S.toString(PendingDiscoveryEvent.class, this);
     }
 }

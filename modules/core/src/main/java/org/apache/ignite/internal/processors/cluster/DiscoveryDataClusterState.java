@@ -51,11 +51,22 @@ public class DiscoveryDataClusterState implements Serializable {
     /** */
     private transient volatile Boolean transitionRes;
 
-    public static DiscoveryDataClusterState createState(boolean active) {
+    /**
+     * @param active Current status.
+     * @return State instance.
+     */
+    static DiscoveryDataClusterState createState(boolean active) {
         return new DiscoveryDataClusterState(active, null, null, null);
     }
 
-    public static DiscoveryDataClusterState createTransitionState(boolean active,
+    /**
+     * @param active New status.
+     * @param transitionReqId State change request ID.
+     * @param transitionTopVer State change topology version.
+     * @param transitionNodes Nodes participating in state change exchange.
+     * @return State instance.
+     */
+    static DiscoveryDataClusterState createTransitionState(boolean active,
         UUID transitionReqId,
         AffinityTopologyVersion transitionTopVer,
         Set<UUID> transitionNodes) {
@@ -82,6 +93,9 @@ public class DiscoveryDataClusterState implements Serializable {
         this.transitionNodes = transitionNodes;
     }
 
+    /**
+     * @return
+     */
     @Nullable public Boolean transitionResult() {
         return transitionRes;
     }
@@ -101,22 +115,37 @@ public class DiscoveryDataClusterState implements Serializable {
         }
     }
 
+    /**
+     * @return State change request ID.
+     */
     public UUID transitionRequestId() {
         return transitionReqId;
     }
 
+    /**
+     * @return {@code True} if state change is in progress.
+     */
     public boolean transition() {
         return transitionReqId != null;
     }
 
+    /**
+     * @return State change exchange version.
+     */
     public AffinityTopologyVersion transitionTopologyVersion() {
         return transitionTopVer;
     }
 
+    /**
+     * @return Current cluster state (or new state in case when transition is in progress).
+     */
     public boolean active() {
         return active;
     }
 
+    /**
+     * @return Nodes participating in state change exchange.
+     */
     public Set<UUID> transitionNodes() {
         return transitionNodes;
     }

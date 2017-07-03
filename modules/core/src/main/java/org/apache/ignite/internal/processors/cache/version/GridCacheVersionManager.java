@@ -87,6 +87,7 @@ public class GridCacheVersionManager extends GridCacheSharedManagerAdapter {
         cctx.gridEvents().addLocalEventListener(discoLsnr, EVT_NODE_METRICS_UPDATED);
     }
 
+    // TODO GG-12389.
     /** {@inheritDoc} */
 //    @Override protected void onKernalStart0(boolean active, boolean reconnect) throws IgniteCheckedException {
 //        for (ClusterNode n : cctx.discovery().remoteNodes())

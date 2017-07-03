@@ -315,10 +315,12 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
      * @param srvs Number of servers.
      * @param clients Number of clients.
      * @param initiallyActive If {@code true} start cluster in active state (otherwise in inactive).
-     * @return Activation future.
+     * @return State change future.
      * @throws Exception If failed.
      */
-    private IgniteInternalFuture<?> startNodesAndBlockStatusChange(int srvs, int clients, boolean initiallyActive) throws Exception {
+    private IgniteInternalFuture<?> startNodesAndBlockStatusChange(int srvs,
+        int clients,
+        final boolean initiallyActive) throws Exception {
         active = initiallyActive;
         testSpi = true;
 
@@ -350,9 +352,9 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
             }
         });
 
-        IgniteInternalFuture<?> activeFut = GridTestUtils.runAsync(new Runnable() {
+        IgniteInternalFuture<?> stateChangeFut = GridTestUtils.runAsync(new Runnable() {
             @Override public void run() {
-                ignite(0).active(true);
+                ignite(0).active(!initiallyActive);
             }
         });
 
@@ -360,16 +362,88 @@ public class IgniteClusterActivateDeactivateTest extends GridCommonAbstractTest 
 
         U.sleep(500);
 
-        assertFalse(activeFut.isDone());
+        assertFalse(stateChangeFut.isDone());
 
-        return activeFut;
+        return stateChangeFut;
     }
 
     /**
      * @throws Exception If failed.
      */
     public void testJoinWhileDeactivate1_Server() throws Exception {
-        joinWhileActivate1(false, false);
+        joinWhileDeactivate1(false, false);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testJoinWhileDeactivate1_WithCache_Server() throws Exception {
+        joinWhileDeactivate1(false, true);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testJoinWhileDeactivate1_Client() throws Exception {
+        joinWhileDeactivate1(true, false);
+    }
+
+    /**
+     * @param startClient If {@code true} joins client node, otherwise server.
+     * @param withNewCache If {@code true} joining node has new cache in configuration.
+     * @throws Exception If failed.
+     */
+    private void joinWhileDeactivate1(final boolean startClient, final boolean withNewCache) throws Exception {
+        IgniteInternalFuture<?> activeFut = startNodesAndBlockStatusChange(2, 0, true);
+
+        IgniteInternalFuture<?> startFut = GridTestUtils.runAsync(new Callable<Void>() {
+            @Override public Void call() throws Exception {
+                client = startClient;
+
+                ccfgs = withNewCache ? cacheConfigurations2() : cacheConfigurations1();
+
+                startGrid(2);
+
+                return null;
+            }
+        });
+
+        TestRecordingCommunicationSpi spi1 = TestRecordingCommunicationSpi.spi(ignite(1));
+
+        spi1.stopBlock();
+
+        activeFut.get();
+        startFut.get();
+
+        checkNoCaches(3);
+
+        ignite(2).active(true);
+
+        for (int c = 0; c < 2; c++)
+            checkCache(ignite(2), CACHE_NAME_PREFIX + c, true);
+
+        if (withNewCache) {
+            for (int i = 0; i < 3; i++) {
+                for (int c = 0; c < 4; c++)
+                    checkCache(ignite(i), CACHE_NAME_PREFIX + c, true);
+            }
+        }
+
+        awaitPartitionMapExchange();
+
+        checkCaches(3, withNewCache ? 4 : 2);
+
+        client = false;
+
+        startGrid(3);
+
+        checkCaches(4, withNewCache ? 4 : 2);
+
+        client = true;
+
+        startGrid(4);
+
+        checkCaches(5, withNewCache ? 4 : 2);
     }
 
     /**

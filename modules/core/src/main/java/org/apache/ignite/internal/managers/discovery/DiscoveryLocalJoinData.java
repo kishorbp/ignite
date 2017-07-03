@@ -20,10 +20,11 @@ package org.apache.ignite.internal.managers.discovery;
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
+import org.apache.ignite.internal.util.typedef.internal.S;
 import org.jetbrains.annotations.Nullable;
 
 /**
- *
+ * Information about local join event.
  */
 public class DiscoveryLocalJoinData {
     /** */
@@ -41,6 +42,12 @@ public class DiscoveryLocalJoinData {
     /** */
     private final boolean active;
 
+    /**
+     * @param evt Event.
+     * @param discoCache Discovery data cache.
+     * @param transitionWaitFut Future if cluster state transition is in progress.
+     * @param active Cluster active status.
+     */
     public DiscoveryLocalJoinData(DiscoveryEvent evt,
         DiscoCache discoCache,
         @Nullable IgniteInternalFuture<Boolean> transitionWaitFut,
@@ -55,23 +62,43 @@ public class DiscoveryLocalJoinData {
         joinTopVer = new AffinityTopologyVersion(evt.topologyVersion(), 0);
     }
 
+    /**
+     * @return Future if cluster state transition is in progress.
+     */
     @Nullable public IgniteInternalFuture<Boolean> transitionWaitFuture() {
         return transitionWaitFut;
     }
 
+    /**
+     * @return Cluster state.
+     */
     public boolean active() {
         return active;
     }
 
+    /**
+     * @return Event.
+     */
     public DiscoveryEvent event() {
         return evt;
     }
 
+    /**
+     * @return Discovery data cache.
+     */
     public DiscoCache discoCache() {
         return discoCache;
     }
 
+    /**
+     * @return Join topology version.
+     */
     public AffinityTopologyVersion joinTopologyVersion() {
         return joinTopVer;
+    }
+
+    /** {@inheritDoc} */
+    @Override public String toString() {
+        return S.toString(DiscoveryLocalJoinData.class, this);
     }
 }
