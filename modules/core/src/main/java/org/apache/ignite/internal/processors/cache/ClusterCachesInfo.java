@@ -1052,8 +1052,6 @@ class ClusterCachesInfo {
                         locCfgsForActivation.put(desc.cacheName(), new T2<>(desc.cacheConfiguration(), nearCfg));
                 }
             }
-
-            joinDiscoData = null;
         }
     }
 

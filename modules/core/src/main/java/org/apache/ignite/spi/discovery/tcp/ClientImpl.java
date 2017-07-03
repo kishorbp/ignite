@@ -484,6 +484,8 @@ class ClientImpl extends TcpDiscoveryImpl {
 
         long startTime = U.currentTimeMillis();
 
+        DiscoveryDataPacket discoveryData = spi.collectExchangeData(new DiscoveryDataPacket(getLocalNodeId()));
+
         while (true) {
             if (Thread.currentThread().isInterrupted())
                 throw new InterruptedException();
@@ -521,7 +523,7 @@ class ClientImpl extends TcpDiscoveryImpl {
 
                 InetSocketAddress addr = it.next();
 
-                T3<SocketStream, Integer, Boolean> sockAndRes = sendJoinRequest(recon, addr);
+                T3<SocketStream, Integer, Boolean> sockAndRes = sendJoinRequest(recon, addr, discoveryData);
 
                 if (sockAndRes == null) {
                     it.remove();
@@ -580,9 +582,12 @@ class ClientImpl extends TcpDiscoveryImpl {
     /**
      * @param recon {@code True} if reconnects.
      * @param addr Address.
+     * @param discoveryData Discovery data.
      * @return Socket, connect response and client acknowledge support flag.
      */
-    @Nullable private T3<SocketStream, Integer, Boolean> sendJoinRequest(boolean recon, InetSocketAddress addr) {
+    @Nullable private T3<SocketStream, Integer, Boolean> sendJoinRequest(boolean recon,
+        InetSocketAddress addr,
+        DiscoveryDataPacket discoveryData) {
         assert addr != null;
 
         if (log.isDebugEnabled())
@@ -645,9 +650,7 @@ class ClientImpl extends TcpDiscoveryImpl {
                         marshalCredentials(node);
                     }
 
-                    msg = new TcpDiscoveryJoinRequestMessage(
-                            node,
-                            spi.collectExchangeData(new DiscoveryDataPacket(getLocalNodeId())));
+                    msg = new TcpDiscoveryJoinRequestMessage(node, discoveryData);
                 }
                 else
                     msg = new TcpDiscoveryClientReconnectMessage(getLocalNodeId(), rmtNodeId, lastMsgId);

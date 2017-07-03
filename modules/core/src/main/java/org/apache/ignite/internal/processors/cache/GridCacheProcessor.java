@@ -695,7 +695,7 @@ public class GridCacheProcessor extends GridProcessorAdapter {
         for (GridCacheSharedManager mgr : sharedCtx.managers())
             mgr.start(sharedCtx);
 
-        if (!ctx.config().isDaemon()) {
+        if (!ctx.isDaemon()) {
             Map<String, CacheInfo> caches = new HashMap<>();
 
             Map<String, CacheInfo> templates = new HashMap<>();

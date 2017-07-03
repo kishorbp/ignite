@@ -764,10 +764,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
             try {
                 cctx.activate();
 
-                List<DynamicCacheDescriptor> startDescs = null;
-
                 if (cctx.database().persistenceEnabled() && !cctx.kernalContext().clientNode()) {
-                    startDescs = new ArrayList<>();
+                    List<DynamicCacheDescriptor> startDescs = new ArrayList<>();
 
                     for (ExchangeActions.ActionData startReq : exchActions.cacheStartRequests())
                         startDescs.add(startReq.descriptor());
@@ -789,6 +787,12 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                     ", topVer=" + topologyVersion() + "]", e);
 
                 changeGlobalStateE = e;
+
+                if (crd) {
+                    synchronized (this) {
+                        changeGlobalStateExceptions.put(cctx.localNodeId(), e);
+                    }
+                }
             }
         }
         else {
@@ -1892,6 +1896,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                     nodes = new ArrayList<>(srvNodes);
                 }
 
+                IgniteCheckedException err = null;
+
                 if (stateChangeExchange()) {
                     StateChangeRequest req = exchActions.stateChangeRequest();
 
@@ -1901,6 +1907,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
                     if (!F.isEmpty(changeGlobalStateExceptions)) {
                         stateChangeErr = true;
+
+                        err = new IgniteCheckedException("Cluster state change failed.");
 
                         cctx.kernalContext().state().onStateChangeError(changeGlobalStateExceptions, req);
                     }
@@ -1917,7 +1925,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
                 if (!nodes.isEmpty())
                     sendAllPartitions(nodes);
 
-                onDone(exchangeId().topologyVersion());
+                onDone(exchangeId().topologyVersion(), err);
             }
         }
         catch (IgniteCheckedException e) {
@@ -2047,10 +2055,15 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
         updatePartitionFullMap(msg);
 
-        if (stateChangeExchange() && !F.isEmpty(msg.getErrorsMap()))
-            cctx.kernalContext().state().onStateChangeError(msg.getErrorsMap(), exchActions.stateChangeRequest());
+        IgniteCheckedException err = null;
 
-        onDone(exchId.topologyVersion());
+        if (stateChangeExchange() && !F.isEmpty(msg.getErrorsMap())) {
+            err = new IgniteCheckedException("Cluster state change failed");
+
+            cctx.kernalContext().state().onStateChangeError(msg.getErrorsMap(), exchActions.stateChangeRequest());
+        }
+
+        onDone(exchId.topologyVersion(), err);
     }
 
     /**

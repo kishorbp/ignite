@@ -275,10 +275,22 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
      * @return Local future for state change process.
      */
     @Nullable private GridChangeGlobalStateFuture changeStateFuture(ChangeGlobalStateMessage msg) {
-        if (msg.initiatorNodeId().equals(ctx.localNodeId())) {
+        return changeStateFuture(msg.initiatorNodeId(), msg.requestId());
+    }
+
+    /**
+     * @param initiatorNode Node initiated state change process.
+     * @param reqId State change request ID.
+     * @return Local future for state change process.
+     */
+    @Nullable private GridChangeGlobalStateFuture changeStateFuture(UUID initiatorNode, UUID reqId) {
+        assert initiatorNode != null;
+        assert reqId != null;
+
+        if (initiatorNode.equals(ctx.localNodeId())) {
             GridChangeGlobalStateFuture fut = stateChangeFut.get();
 
-            if (fut != null && fut.requestId.equals(msg.requestId()))
+            if (fut != null && fut.requestId.equals(reqId))
                 return fut;
         }
 
@@ -467,13 +479,13 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     }
 
     /**
-     * @param exs Errors.
+     * @param errs Errors.
      * @param req State change request.
      */
-    public void onStateChangeError(Map<UUID, Exception> exs, StateChangeRequest req) {
-        assert !F.isEmpty(exs);
+    public void onStateChangeError(Map<UUID, Exception> errs, StateChangeRequest req) {
+        assert !F.isEmpty(errs);
 
-        // Revert change if activation request fail.
+        // Revert caches start if activation request fail.
         if (req.activate()) {
             try {
                 cacheProc.onKernalStopCaches(true);
@@ -482,20 +494,10 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
 
                 sharedCtx.affinity().removeAllCacheInfo();
 
-                if (!ctx.clientNode()) {
-                    sharedCtx.database().onDeActivate(ctx);
-
-                    if (sharedCtx.pageStore() != null)
-                        sharedCtx.pageStore().onDeActivate(ctx);
-
-                    if (sharedCtx.wal() != null)
-                        sharedCtx.wal().onDeActivate(ctx);
-                }
+                if (!ctx.clientNode())
+                    sharedCtx.deactivate();
             }
             catch (Exception e) {
-                for (Map.Entry<UUID, Exception> entry : exs.entrySet())
-                    e.addSuppressed(entry.getValue());
-
                 U.error(log, "Failed to revert activation request changes", e);
             }
         }
@@ -503,20 +505,19 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
             //todo https://issues.apache.org/jira/browse/IGNITE-5480
         }
 
-        // TODO GG-12389.
-        GridChangeGlobalStateFuture af = stateChangeFut.get();
+        GridChangeGlobalStateFuture fut = changeStateFuture(req.initiatorNodeId(), req.requestId());
 
-        if (af != null && af.requestId.equals(req.requestId())) {
+        if (fut != null) {
             IgniteCheckedException e = new IgniteCheckedException(
-                "Fail " + prettyStr(req.activate()),
+                "Failed to " + prettyStr(req.activate()) + " cluster",
                 null,
                 false
             );
 
-            for (Map.Entry<UUID, Exception> entry : exs.entrySet())
+            for (Map.Entry<UUID, Exception> entry : errs.entrySet())
                 e.addSuppressed(entry.getValue());
 
-            af.onDone(e);
+            fut.onDone(e);
         }
     }
 
