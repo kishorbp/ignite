@@ -145,6 +145,7 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     }
 
     /**
+     * @param discoCache Discovery data cache.
      * @return If transition is in progress returns future which is completed when transition finishes.
      */
     @Nullable public IgniteInternalFuture<Boolean> onLocalJoin(DiscoCache discoCache) {
@@ -342,9 +343,8 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     @Override public void onGridDataReceived(DiscoveryDataBag.GridDiscoveryData data) {
         DiscoveryDataClusterState state = (DiscoveryDataClusterState)data.commonData();
 
-        assert state != null : data;
-
-        globalState = state;
+        if (state != null)
+            globalState = state;
     }
 
     /**
@@ -521,7 +521,7 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     }
 
     /**
-     *
+     * @param req State change request.
      */
     private void onFinalActivate(final StateChangeRequest req) {
         ctx.closure().runLocalSafe(new Runnable() {
@@ -542,7 +542,7 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
                             + ctx.localNodeId() + ", client=" + client + ", topVer=" + req.topologyVersion() + "]");
                 }
                 catch (Exception ex) {
-                    e = ex;
+                    e = new IgniteCheckedException("Failed to perform final activation steps", ex);
 
                     U.error(log, "Failed to perform final activation steps [nodeId=" + ctx.localNodeId() +
                         ", client=" + client + ", topVer=" + req.topologyVersion() + "]", ex);
@@ -557,7 +557,7 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     }
 
     /**
-     *
+     * @param req State change request.
      */
     private void onFinalDeActivate(final StateChangeRequest req) {
         globalState.setTransitionResult(req.requestId(), false);
@@ -566,16 +566,13 @@ public class GridClusterStateProcessor extends GridProcessorAdapter {
     }
 
     /**
-     *
+     * @param req State change request.
      */
-    public void onExchangeDone(boolean fail, StateChangeRequest req) {
-        // TODO GG-12389 pass correct fail flag.
-        if (!fail) {
-            if (req.activate())
-                onFinalActivate(req);
-            else
-                onFinalDeActivate(req);
-        }
+    public void onStateChangeExchangeDone(StateChangeRequest req) {
+        if (req.activate())
+            onFinalActivate(req);
+        else
+            onFinalDeActivate(req);
     }
 
     /**

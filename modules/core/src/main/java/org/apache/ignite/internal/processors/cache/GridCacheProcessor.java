@@ -825,6 +825,9 @@ public class GridCacheProcessor extends GridProcessorAdapter {
     /** {@inheritDoc} */
     @SuppressWarnings("unchecked")
     @Override public void onKernalStart(boolean active) throws IgniteCheckedException {
+        if (ctx.isDaemon())
+            return;
+
         try {
             boolean checkConsistency =
                 !ctx.config().isDaemon() && !getBoolean(IGNITE_SKIP_CONFIGURATION_CONSISTENCY_CHECK);
@@ -844,7 +847,7 @@ public class GridCacheProcessor extends GridProcessorAdapter {
             cacheStartedLatch.countDown();
         }
 
-        if (!ctx.clientNode() && !ctx.isDaemon())
+        if (!ctx.clientNode())
             addRemovedItemsCleanupTask(Long.getLong(IGNITE_CACHE_REMOVED_ENTRIES_TTL, 10_000));
 
         // Escape if cluster inactive.
@@ -1974,7 +1977,7 @@ public class GridCacheProcessor extends GridProcessorAdapter {
 
             sharedCtx.removeCacheContext(ctx);
 
-            onKernalStop(cache, destroy);
+            onKernalStop(cache, true);
 
             stopCache(cache, true, destroy);
 

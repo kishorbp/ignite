@@ -701,7 +701,8 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
 
                     discoWrk.discoCache = discoCache;
 
-                    ctx.cache().context().exchange().onLocalJoin(discoEvt, discoCache);
+                    if (!isLocDaemon)
+                        ctx.cache().context().exchange().onLocalJoin(discoEvt, discoCache);
 
                     locJoin.onDone(new DiscoveryLocalJoinData(discoEvt,
                         discoCache,

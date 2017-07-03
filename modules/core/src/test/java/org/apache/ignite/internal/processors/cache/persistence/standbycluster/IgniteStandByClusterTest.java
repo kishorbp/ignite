@@ -60,7 +60,7 @@ public class IgniteStandByClusterTest extends GridCommonAbstractTest {
     /**
      * @throws Exception if fail.
      */
-    public void testNotStartDynamicCachesOnClientAfterActivation() throws Exception {
+    public void testStartDynamicCachesAfterActivation() throws Exception {
         final String cacheName0 = "cache0";
         final String cacheName = "cache";
 
@@ -114,13 +114,10 @@ public class IgniteStandByClusterTest extends GridCommonAbstractTest {
         Map<String, GridCacheAdapter<?, ?>> caches = U.field(ig3.context().cache(), "caches");
 
         // Only system cache and cache0
-        assertEquals("Unexpected caches: " + caches.keySet(), 2, caches.size());
+        assertEquals("Unexpected caches: " + caches.keySet(), 3, caches.size());
         assertTrue(caches.containsKey(CU.UTILITY_CACHE_NAME));
         assertTrue(caches.containsKey(cacheName0));
-
-        assertNull(caches.get(cacheName));
-
-        assertNotNull(caches.get(cacheName0));
+        assertTrue(caches.containsKey(cacheName));
 
         assertNotNull(ig3.cache(cacheName));
     }
@@ -280,7 +277,7 @@ public class IgniteStandByClusterTest extends GridCommonAbstractTest {
         private final String name;
 
         /**
-         * @param name
+         * @param name Node name.
          */
         private NodeFilterIgnoreByName(String name) {
             this.name = name;

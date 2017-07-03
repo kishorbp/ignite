@@ -1217,7 +1217,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
             m.partitionHistoryCounters(partHistReserved0);
 
         if (stateChangeExchange() && changeGlobalStateE != null)
-            m.setException(changeGlobalStateE);
+            m.setError(changeGlobalStateE);
 
         if (log.isDebugEnabled())
             log.debug("Sending local partitions [nodeId=" + node.id() + ", exchId=" + exchId + ", msg=" + m + ']');
@@ -1247,7 +1247,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
             compress);
 
         if (stateChangeExchange() && !F.isEmpty(changeGlobalStateExceptions))
-            m.setExceptionsMap(changeGlobalStateExceptions);
+            m.setErrorsMap(changeGlobalStateExceptions);
 
         return m;
     }
@@ -1261,9 +1261,10 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
         assert !nodes.contains(cctx.localNode());
 
-        if (log.isDebugEnabled())
+        if (log.isDebugEnabled()) {
             log.debug("Sending full partition map [nodeIds=" + F.viewReadOnly(nodes, F.node2id()) +
                 ", exchId=" + exchId + ", msg=" + m + ']');
+        }
 
         for (ClusterNode node : nodes) {
             try {
@@ -1378,7 +1379,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
             exchActions.completeRequestFutures(cctx);
 
         if (stateChangeExchange() && err == null)
-            cctx.kernalContext().state().onExchangeDone(false, exchActions.stateChangeRequest());
+            cctx.kernalContext().state().onStateChangeExchangeDone(exchActions.stateChangeRequest());
 
         Map<T2<Integer, Integer>, Long> localReserved = partHistSuppliers.getReservations(cctx.localNodeId());
 
@@ -1454,6 +1455,7 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
         crd = null;
         partReleaseFut = null;
         changeGlobalStateE = null;
+        exchActions = null;
     }
 
     /**
@@ -1530,8 +1532,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
                     pendingSingleUpdates++;
 
-                    if (stateChangeExchange() && msg.getException() != null)
-                        changeGlobalStateExceptions.put(node.id(), msg.getException());
+                    if (stateChangeExchange() && msg.getError() != null)
+                        changeGlobalStateExceptions.put(node.id(), msg.getError());
 
                     allReceived = remaining.isEmpty();
                 }
@@ -1872,12 +1874,19 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
                     assert req != null : exchActions;
 
-                    if (!F.isEmpty(changeGlobalStateExceptions))
-                        cctx.kernalContext().state().onStateChangeError(changeGlobalStateExceptions, req);
+                    boolean stateChangeErr = false;
 
-                    // TODO GG-12389 (check result + case when sent full message but failed before custom message sent)
+                    if (!F.isEmpty(changeGlobalStateExceptions)) {
+                        stateChangeErr = true;
+
+                        cctx.kernalContext().state().onStateChangeError(changeGlobalStateExceptions, req);
+                    }
+
+                    boolean active = !stateChangeErr && req.activate();
+
+                    // TODO GG-12389 (case when sent full message but failed before custom message sent)
                     ChangeGlobalStateFinishMessage msg = new ChangeGlobalStateFinishMessage(req.requestId(),
-                        req.activate());
+                        active);
 
                     cctx.discovery().sendCustomEvent(msg);
                 }
@@ -2015,8 +2024,8 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
         updatePartitionFullMap(msg);
 
-        if (stateChangeExchange() && !F.isEmpty(msg.getExceptionsMap()))
-            cctx.kernalContext().state().onStateChangeError(msg.getExceptionsMap(), exchActions.stateChangeRequest());
+        if (stateChangeExchange() && !F.isEmpty(msg.getErrorsMap()))
+            cctx.kernalContext().state().onStateChangeError(msg.getErrorsMap(), exchActions.stateChangeRequest());
 
         onDone(exchId.topologyVersion());
     }

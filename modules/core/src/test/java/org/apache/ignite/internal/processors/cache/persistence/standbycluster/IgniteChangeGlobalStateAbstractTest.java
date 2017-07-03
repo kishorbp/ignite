@@ -330,11 +330,13 @@ public abstract class IgniteChangeGlobalStateAbstractTest extends GridCommonAbst
     @Override protected IgniteConfiguration getConfiguration(final String gridName) throws Exception {
         final IgniteConfiguration cfg = super.getConfiguration(gridName);
 
+        cfg.setConsistentId(gridName);
+
         PersistentStoreConfiguration pCfg = new PersistentStoreConfiguration();
 
-        pCfg.setPersistentStorePath(testName() + "/db");
-        pCfg.setWalArchivePath(testName() + "/db/wal/archive");
-        pCfg.setWalStorePath(testName() + "/db/wal");
+        pCfg.setPersistentStorePath(testName() + "/" + gridName + "/db");
+        pCfg.setWalArchivePath(testName() + "/" + gridName + "/db/wal/archive");
+        pCfg.setWalStorePath(testName() + "/" + gridName + "/db/wal");
 
         cfg.setPersistentStoreConfiguration(pCfg);
 

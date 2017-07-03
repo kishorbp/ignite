@@ -54,7 +54,7 @@ public class IgniteChangeGlobalStateFailOverTest extends IgniteChangeGlobalState
     }
 
     /**
-     *
+     * @throws Exception If failed.
      */
     public void testActivateDeActivateOnFixTopology() throws Exception {
         final Ignite igB1 = backUp(0);
@@ -140,7 +140,7 @@ public class IgniteChangeGlobalStateFailOverTest extends IgniteChangeGlobalState
     }
 
     /**
-     *
+     * @throws Exception If failed.
      */
     public void testActivateDeActivateOnJoiningNode() throws Exception {
         fail("https://issues.apache.org/jira/browse/IGNITE-5520");
@@ -252,7 +252,7 @@ public class IgniteChangeGlobalStateFailOverTest extends IgniteChangeGlobalState
     }
 
     /**
-     *
+     * @throws Exception If failed.
      */
     public void testActivateDeActivateOnFixTopologyWithPutValues() throws Exception {
         final Ignite igB1 = backUp(0);

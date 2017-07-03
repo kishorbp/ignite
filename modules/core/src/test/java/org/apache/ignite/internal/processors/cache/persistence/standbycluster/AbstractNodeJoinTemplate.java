@@ -54,10 +54,13 @@ public abstract class AbstractNodeJoinTemplate extends GridCommonAbstractTest {
     protected static final String cache2 = "cache2";
 
     //Todo Cache with node filter.
+    /** */
     protected static final String cache3 = "cache3";
 
+    /** */
     protected static final String cache4 = "cache4";
 
+    /** */
     protected static final String cache5 = "cache5";
 
     /** Caches info. */
@@ -121,52 +124,61 @@ public abstract class AbstractNodeJoinTemplate extends GridCommonAbstractTest {
     public abstract JoinNodeTestPlanBuilder joinClientStaticCacheConfigurationDifferentOnBothTemplate() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testJoinWithOutConfiguration() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testStaticCacheConfigurationOnJoin() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testStaticCacheConfigurationInCluster() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testStaticCacheConfigurationSameOnBoth() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testStaticCacheConfigurationDifferentOnBoth() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testJoinClientWithOutConfiguration() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testJoinClientStaticCacheConfigurationOnJoin() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testJoinClientStaticCacheConfigurationInCluster() throws Exception;
 
     /**
+     * @throws Exception If failed.
      *
      */
     public abstract void testJoinClientStaticCacheConfigurationSameOnBoth() throws Exception;
 
     /**
-     *
+     * @throws Exception If failed.
      */
     public abstract void testJoinClientStaticCacheConfigurationDifferentOnBoth() throws Exception;
 
@@ -309,6 +321,7 @@ public abstract class AbstractNodeJoinTemplate extends GridCommonAbstractTest {
         /** After de activate. */
         private Runnable afterDeActivate = Noop;
 
+        /** */
         private IgniteCallable<List<CacheConfiguration>> dynamicCacheStart =
             new IgniteCallable<List<CacheConfiguration>>() {
                 @Override public List<CacheConfiguration> call() throws Exception {
@@ -316,6 +329,7 @@ public abstract class AbstractNodeJoinTemplate extends GridCommonAbstractTest {
                 }
             };
 
+        /** */
         private IgniteCallable<List<String>> dynamicCacheStop =
             new IgniteCallable<List<String>>() {
                 @Override public List<String> call() throws Exception {
@@ -323,8 +337,10 @@ public abstract class AbstractNodeJoinTemplate extends GridCommonAbstractTest {
                 }
             };
 
+        /** */
         private Runnable afterDynamicCacheStarted = Noop;
 
+        /** */
         private Runnable afterDynamicCacheStopped = Noop;
 
         /** End. */
@@ -691,10 +707,6 @@ public abstract class AbstractNodeJoinTemplate extends GridCommonAbstractTest {
         public Runnable checkCacheEmpty() {
             return onAllNode(new IgniteInClosure<IgniteEx>() {
                 @Override public void apply(IgniteEx ig) {
-                    Map<String, DynamicCacheDescriptor> desc = cacheDescriptors(ig);
-
-                    Assert.assertTrue(desc.isEmpty());
-
                     Assert.assertNull(ig.context().cache().cache(cache1));
                     Assert.assertNull(ig.context().cache().cache(cache2));
 
